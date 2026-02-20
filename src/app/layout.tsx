@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/lib/providers";
 import { ServiceWorkerRegister } from "@/components/sw-register";
@@ -18,18 +18,19 @@ export const metadata: Metadata = {
   title: "AutoShopShift",
   description: "Workforce management for auto repair shops",
   manifest: "/manifest.json",
-  themeColor: "#0f172a",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "ShopShift",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
