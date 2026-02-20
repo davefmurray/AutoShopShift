@@ -47,41 +47,62 @@ export function ShiftDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [date, setDate] = useState(defaultDate ?? format(new Date(), "yyyy-MM-dd"));
-  const [startTime, setStartTime] = useState("08:00");
-  const [endTime, setEndTime] = useState("17:00");
-  const [userId, setUserId] = useState<string>("none");
-  const [positionId, setPositionId] = useState<string>("none");
-  const [scheduleId, setScheduleId] = useState<string>("none");
-  const [breakMinutes, setBreakMinutes] = useState("30");
-  const [isOpen, setIsOpen] = useState(false);
-  const [notes, setNotes] = useState("");
-
-  useEffect(() => {
+  function getInitialState() {
     if (shift) {
       const start = new Date(shift.start_time);
       const end = new Date(shift.end_time);
-      setDate(format(start, "yyyy-MM-dd"));
-      setStartTime(format(start, "HH:mm"));
-      setEndTime(format(end, "HH:mm"));
-      setUserId(shift.user_id ?? "none");
-      setPositionId(shift.position_id ?? "none");
-      setScheduleId(shift.schedule_id ?? "none");
-      setBreakMinutes(String(shift.break_minutes));
-      setIsOpen(shift.is_open);
-      setNotes(shift.notes ?? "");
-    } else {
-      setDate(defaultDate ?? format(new Date(), "yyyy-MM-dd"));
-      setStartTime("08:00");
-      setEndTime("17:00");
-      setUserId("none");
-      setPositionId("none");
-      setScheduleId("none");
-      setBreakMinutes("30");
-      setIsOpen(false);
-      setNotes("");
+      return {
+        date: format(start, "yyyy-MM-dd"),
+        startTime: format(start, "HH:mm"),
+        endTime: format(end, "HH:mm"),
+        userId: shift.user_id ?? "none",
+        positionId: shift.position_id ?? "none",
+        scheduleId: shift.schedule_id ?? "none",
+        breakMinutes: String(shift.break_minutes),
+        isOpen: shift.is_open,
+        notes: shift.notes ?? "",
+      };
     }
-  }, [shift, defaultDate]);
+    return {
+      date: defaultDate ?? format(new Date(), "yyyy-MM-dd"),
+      startTime: "08:00",
+      endTime: "17:00",
+      userId: "none",
+      positionId: "none",
+      scheduleId: "none",
+      breakMinutes: "30",
+      isOpen: false,
+      notes: "",
+    };
+  }
+
+  const initial = getInitialState();
+  const [date, setDate] = useState(initial.date);
+  const [startTime, setStartTime] = useState(initial.startTime);
+  const [endTime, setEndTime] = useState(initial.endTime);
+  const [userId, setUserId] = useState<string>(initial.userId);
+  const [positionId, setPositionId] = useState<string>(initial.positionId);
+  const [scheduleId, setScheduleId] = useState<string>(initial.scheduleId);
+  const [breakMinutes, setBreakMinutes] = useState(initial.breakMinutes);
+  const [isOpen, setIsOpen] = useState(initial.isOpen);
+  const [notes, setNotes] = useState(initial.notes);
+
+  // Reset form when shift/defaultDate changes (dialog opens with new data)
+  const shiftId = shift?.id ?? null;
+  useEffect(() => {
+    const state = getInitialState();
+    setDate(state.date);
+    setStartTime(state.startTime);
+    setEndTime(state.endTime);
+    setUserId(state.userId);
+    setPositionId(state.positionId);
+    setScheduleId(state.scheduleId);
+    setBreakMinutes(state.breakMinutes);
+    setIsOpen(state.isOpen);
+    setNotes(state.notes);
+    // Only reset when the shift being edited changes, not on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shiftId, defaultDate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -46,9 +46,13 @@ export default function SchedulePage() {
 
   const { data: shifts = [], isLoading } = useShifts(rangeStart, rangeEnd);
 
+  function handleNewShift() {
+    setEditingShift(null);
+    setDialogOpen(true);
+  }
+
   const shortcutHandlers = useMemo(
     () => ({ onNewShift: handleNewShift }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
   useKeyboardShortcuts(shortcutHandlers);
@@ -58,11 +62,6 @@ export default function SchedulePage() {
       activationConstraint: { distance: 8 },
     })
   );
-
-  function handleNewShift() {
-    setEditingShift(null);
-    setDialogOpen(true);
-  }
 
   function handleEditShift(shift: Shift) {
     setEditingShift(shift);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useShopStore } from "@/stores/shop-store";
@@ -29,7 +29,6 @@ import Link from "next/link";
 
 export default function MemberDetailPage() {
   const { memberId } = useParams<{ memberId: string }>();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const shopId = useShopStore((s) => s.activeShopId);
 
