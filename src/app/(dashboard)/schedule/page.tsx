@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CalendarToolbar } from "@/components/schedule/calendar-toolbar";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { WeekView } from "@/components/schedule/week-view";
 import { DayView } from "@/components/schedule/day-view";
 import { ListView } from "@/components/schedule/list-view";
@@ -44,6 +45,13 @@ export default function SchedulePage() {
       : format(weekEnd, "yyyy-MM-dd'T'HH:mm:ss");
 
   const { data: shifts = [], isLoading } = useShifts(rangeStart, rangeEnd);
+
+  const shortcutHandlers = useMemo(
+    () => ({ onNewShift: handleNewShift }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  useKeyboardShortcuts(shortcutHandlers);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -97,9 +105,9 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-4 pb-16">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CalendarToolbar />
-        <Button onClick={handleNewShift}>
+        <Button onClick={handleNewShift} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           New Shift
         </Button>
