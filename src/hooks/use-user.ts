@@ -2,14 +2,32 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import type { Tables, Enums } from "@/types/supabase";
+import type { Enums } from "@/types/supabase";
 
 export type UserWithProfile = {
   id: string;
   email: string;
-  profile: Tables<"profiles"> | null;
-  shopMember: Tables<"shop_members"> | null;
-  shop: Tables<"shops"> | null;
+  profile: {
+    id: string;
+    email: string;
+    full_name: string | null;
+    phone: string | null;
+    avatar_url: string | null;
+  } | null;
+  shopMember: {
+    id: string;
+    shop_id: string;
+    user_id: string;
+    role: Enums<"shop_role">;
+    hourly_rate: number | null;
+    max_hours_per_week: number | null;
+    is_active: boolean;
+  } | null;
+  shop: {
+    id: string;
+    name: string;
+    timezone: string;
+  } | null;
   role: Enums<"shop_role"> | null;
 };
 
@@ -31,8 +49,8 @@ export function useUser(shopId?: string) {
         .eq("id", user.id)
         .single();
 
-      let shopMember: Tables<"shop_members"> | null = null;
-      let shop: Tables<"shops"> | null = null;
+      let shopMember: UserWithProfile["shopMember"] = null;
+      let shop: UserWithProfile["shop"] = null;
 
       if (shopId) {
         const { data: memberData } = await supabase
@@ -42,12 +60,12 @@ export function useUser(shopId?: string) {
           .eq("user_id", user.id)
           .eq("is_active", true)
           .single();
-        shopMember = memberData as Tables<"shop_members"> | null;
+        shopMember = memberData;
 
         if (shopMember) {
           const { data: shopData } = await supabase
             .from("shops")
-            .select("*")
+            .select("id, name, timezone")
             .eq("id", shopId)
             .single();
           shop = shopData;
