@@ -100,8 +100,8 @@ export function WeekView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftCli
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="flex divide-x">
+    <div className="border rounded-lg overflow-x-auto">
+      <div className="flex divide-x min-w-[640px]">
         {days.map((day) => (
           <DayColumn
             key={day.toISOString()}
