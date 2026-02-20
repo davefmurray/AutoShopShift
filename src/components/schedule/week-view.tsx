@@ -11,11 +11,13 @@ function DayColumn({
   shifts,
   members,
   positions,
+  onShiftClick,
 }: {
   date: Date;
   shifts: Shift[];
   members: { user_id: string; profile?: { full_name: string | null } }[];
   positions: { id: string; name: string; color: string }[];
+  onShiftClick?: (shift: Shift) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `user-open-${format(date, "yyyy-MM-dd")}`,
@@ -58,6 +60,7 @@ function DayColumn({
                 positionColor={pos?.color}
                 positionName={pos?.name}
                 compact
+                onClick={() => onShiftClick?.(shift)}
               />
             );
           })}
@@ -79,6 +82,7 @@ function DayColumn({
               positionColor={pos?.color}
               positionName={pos?.name}
               compact
+              onClick={() => onShiftClick?.(shift)}
             />
           );
         })}
@@ -87,7 +91,7 @@ function DayColumn({
   );
 }
 
-export function WeekView({ shifts }: { shifts: Shift[] }) {
+export function WeekView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClick?: (shift: Shift) => void }) {
   const { currentDate } = useCalendarStore();
   const { data: members = [] } = useMembers();
   const { data: positions = [] } = usePositions();
@@ -105,6 +109,7 @@ export function WeekView({ shifts }: { shifts: Shift[] }) {
             shifts={shifts}
             members={members}
             positions={positions}
+            onShiftClick={onShiftClick}
           />
         ))}
       </div>

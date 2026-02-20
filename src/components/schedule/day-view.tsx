@@ -7,7 +7,7 @@ import { ShiftCard } from "./shift-card";
 
 const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
 
-export function DayView({ shifts }: { shifts: Shift[] }) {
+export function DayView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClick?: (shift: Shift) => void }) {
   const { currentDate } = useCalendarStore();
   const { data: members = [] } = useMembers();
   const { data: positions = [] } = usePositions();
@@ -42,6 +42,7 @@ export function DayView({ shifts }: { shifts: Shift[] }) {
                     <ShiftCard
                       key={shift.id}
                       shift={shift}
+                      onClick={() => onShiftClick?.(shift)}
                       memberName={
                         (member as { profile?: { full_name: string | null } } | undefined)
                           ?.profile?.full_name ?? undefined
