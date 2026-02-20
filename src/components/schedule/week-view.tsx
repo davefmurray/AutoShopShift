@@ -1,8 +1,10 @@
 "use client";
 
 import { format, addDays, isSameDay, startOfWeek } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { useDroppable } from "@dnd-kit/core";
 import { useCalendarStore } from "@/stores/calendar-store";
+import { useShopTimezone } from "@/hooks/use-shop-timezone";
 import { useMembers, usePositions, type Shift } from "@/hooks/use-shifts";
 import { ShiftCard } from "./shift-card";
 
@@ -11,12 +13,14 @@ function DayColumn({
   shifts,
   members,
   positions,
+  timezone,
   onShiftClick,
 }: {
   date: Date;
   shifts: Shift[];
   members: { user_id: string; profile?: { full_name: string | null } }[];
   positions: { id: string; name: string; color: string }[];
+  timezone: string;
   onShiftClick?: (shift: Shift) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -24,8 +28,9 @@ function DayColumn({
   });
 
   const isToday = isSameDay(date, new Date());
+  const dateStr = format(date, "yyyy-MM-dd");
   const dayShifts = shifts.filter((s) =>
-    isSameDay(new Date(s.start_time), date)
+    formatInTimeZone(new Date(s.start_time), timezone, "yyyy-MM-dd") === dateStr
   );
   const openShifts = dayShifts.filter((s) => s.is_open || !s.user_id);
   const assignedShifts = dayShifts.filter((s) => !s.is_open && s.user_id);
@@ -59,6 +64,7 @@ function DayColumn({
                 shift={shift}
                 positionColor={pos?.color}
                 positionName={pos?.name}
+                timezone={timezone}
                 compact
                 onClick={() => onShiftClick?.(shift)}
               />
@@ -81,6 +87,7 @@ function DayColumn({
               memberName={member?.profile?.full_name ?? undefined}
               positionColor={pos?.color}
               positionName={pos?.name}
+              timezone={timezone}
               compact
               onClick={() => onShiftClick?.(shift)}
             />
@@ -93,6 +100,7 @@ function DayColumn({
 
 export function WeekView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClick?: (shift: Shift) => void }) {
   const { currentDate } = useCalendarStore();
+  const timezone = useShopTimezone();
   const { data: members = [] } = useMembers();
   const { data: positions = [] } = usePositions();
 
@@ -109,6 +117,7 @@ export function WeekView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftCli
             shifts={shifts}
             members={members}
             positions={positions}
+            timezone={timezone}
             onShiftClick={onShiftClick}
           />
         ))}

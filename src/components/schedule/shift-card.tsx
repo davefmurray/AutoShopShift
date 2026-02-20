@@ -1,8 +1,8 @@
 "use client";
 
-import { format } from "date-fns";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { formatInTimeZone } from "date-fns-tz";
 import type { Shift } from "@/hooks/use-shifts";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ type ShiftCardProps = {
   memberName?: string;
   positionColor?: string;
   positionName?: string;
+  timezone?: string;
   compact?: boolean;
   onClick?: () => void;
 };
@@ -20,6 +21,7 @@ export function ShiftCard({
   memberName,
   positionColor = "#6B7280",
   positionName,
+  timezone = "America/New_York",
   compact = false,
   onClick,
 }: ShiftCardProps) {
@@ -33,8 +35,9 @@ export function ShiftCard({
     borderLeftColor: positionColor,
   };
 
-  const timeDisplay = `${format(new Date(shift.start_time), "h:mm a")} - ${format(
+  const timeDisplay = `${formatInTimeZone(new Date(shift.start_time), timezone, "h:mm a")} - ${formatInTimeZone(
     new Date(shift.end_time),
+    timezone,
     "h:mm a"
   )}`;
 

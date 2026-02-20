@@ -1,10 +1,12 @@
 "use client";
 
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { useShopTimezone } from "@/hooks/use-shop-timezone";
 import { useMembers, usePositions, type Shift } from "@/hooks/use-shifts";
 import { Badge } from "@/components/ui/badge";
 
 export function ListView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClick?: (shift: Shift) => void }) {
+  const timezone = useShopTimezone();
   const { data: members = [] } = useMembers();
   const { data: positions = [] } = usePositions();
 
@@ -43,11 +45,11 @@ export function ListView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftCli
             return (
               <tr key={shift.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => onShiftClick?.(shift)}>
                 <td className="p-3 text-sm">
-                  {format(new Date(shift.start_time), "EEE, MMM d")}
+                  {formatInTimeZone(new Date(shift.start_time), timezone, "EEE, MMM d")}
                 </td>
                 <td className="p-3 text-sm">
-                  {format(new Date(shift.start_time), "h:mm a")} -{" "}
-                  {format(new Date(shift.end_time), "h:mm a")}
+                  {formatInTimeZone(new Date(shift.start_time), timezone, "h:mm a")} -{" "}
+                  {formatInTimeZone(new Date(shift.end_time), timezone, "h:mm a")}
                 </td>
                 <td className="p-3 text-sm">
                   {shift.is_open

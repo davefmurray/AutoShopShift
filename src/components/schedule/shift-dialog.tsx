@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useShopStore } from "@/stores/shop-store";
+import { useShopTimezone } from "@/hooks/use-shop-timezone";
 import { useMembers, usePositions, useSchedules, type Shift } from "@/hooks/use-shifts";
 import { createShift, updateShift, deleteShift } from "@/actions/shifts";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 
 type ShiftDialogProps = {
   open: boolean;
@@ -39,6 +41,7 @@ export function ShiftDialog({
   defaultDate,
 }: ShiftDialogProps) {
   const shopId = useShopStore((s) => s.activeShopId);
+  const timezone = useShopTimezone();
   const queryClient = useQueryClient();
   const { data: members = [] } = useMembers();
   const { data: positions = [] } = usePositions();
@@ -49,12 +52,10 @@ export function ShiftDialog({
 
   function getInitialState() {
     if (shift) {
-      const start = new Date(shift.start_time);
-      const end = new Date(shift.end_time);
       return {
-        date: format(start, "yyyy-MM-dd"),
-        startTime: format(start, "HH:mm"),
-        endTime: format(end, "HH:mm"),
+        date: formatInTimeZone(new Date(shift.start_time), timezone, "yyyy-MM-dd"),
+        startTime: formatInTimeZone(new Date(shift.start_time), timezone, "HH:mm"),
+        endTime: formatInTimeZone(new Date(shift.end_time), timezone, "HH:mm"),
         userId: shift.user_id ?? "none",
         positionId: shift.position_id ?? "none",
         scheduleId: shift.schedule_id ?? "none",
@@ -110,13 +111,17 @@ export function ShiftDialog({
     setLoading(true);
     setError(null);
 
+    // Convert shop-local times to UTC ISO strings
+    const startUtc = fromZonedTime(`${date}T${startTime}:00`, timezone);
+    const endUtc = fromZonedTime(`${date}T${endTime}:00`, timezone);
+
     const payload = {
       shop_id: shopId,
       user_id: userId === "none" ? undefined : userId,
       position_id: positionId === "none" ? undefined : positionId,
       schedule_id: scheduleId === "none" ? undefined : scheduleId,
-      start_time: `${date}T${startTime}:00`,
-      end_time: `${date}T${endTime}:00`,
+      start_time: startUtc.toISOString(),
+      end_time: endUtc.toISOString(),
       break_minutes: parseInt(breakMinutes) || 0,
       is_open: isOpen,
       notes: notes || undefined,

@@ -82,15 +82,17 @@ export default function OnboardingPage() {
       return;
     }
 
-    // Create the shop
-    const { data: shop, error: shopError } = await supabase
-      .from("shops")
-      .insert({ name: shopName, address, city, state, zip, phone, timezone })
-      .select()
-      .single();
+    // Generate shop ID client-side so we can insert shop + member
+    // without needing to SELECT the shop back (blocked by RLS until member exists)
+    const newShopId = crypto.randomUUID();
 
-    if (shopError || !shop) {
-      setError(shopError?.message ?? "Failed to create shop");
+    // Create the shop
+    const { error: shopError } = await supabase
+      .from("shops")
+      .insert({ id: newShopId, name: shopName, address, city, state, zip, phone, timezone });
+
+    if (shopError) {
+      setError(shopError.message);
       setLoading(false);
       return;
     }
@@ -98,7 +100,7 @@ export default function OnboardingPage() {
     // Add current user as owner
     const { error: memberError } = await supabase
       .from("shop_members")
-      .insert({ shop_id: shop.id, user_id: user.id, role: "owner" });
+      .insert({ shop_id: newShopId, user_id: user.id, role: "owner" });
 
     if (memberError) {
       setError(memberError.message);
@@ -106,8 +108,8 @@ export default function OnboardingPage() {
       return;
     }
 
-    setShopId(shop.id);
-    setActiveShopId(shop.id);
+    setShopId(newShopId);
+    setActiveShopId(newShopId);
     setStep("positions");
     setLoading(false);
   }

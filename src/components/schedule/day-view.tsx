@@ -1,7 +1,9 @@
 "use client";
 
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { useCalendarStore } from "@/stores/calendar-store";
+import { useShopTimezone } from "@/hooks/use-shop-timezone";
 import { useMembers, usePositions, type Shift } from "@/hooks/use-shifts";
 import { ShiftCard } from "./shift-card";
 
@@ -9,11 +11,13 @@ const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
 
 export function DayView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClick?: (shift: Shift) => void }) {
   const { currentDate } = useCalendarStore();
+  const timezone = useShopTimezone();
   const { data: members = [] } = useMembers();
   const { data: positions = [] } = usePositions();
 
-  const dayShifts = shifts.filter((s) =>
-    isSameDay(new Date(s.start_time), currentDate)
+  const dateStr = format(currentDate, "yyyy-MM-dd");
+  const dayShifts = shifts.filter(
+    (s) => formatInTimeZone(new Date(s.start_time), timezone, "yyyy-MM-dd") === dateStr
   );
 
   return (
@@ -21,8 +25,8 @@ export function DayView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClic
       <div className="divide-y">
         {HOURS.map((hour) => {
           const hourShifts = dayShifts.filter((s) => {
-            const startHour = new Date(s.start_time).getHours();
-            return startHour === hour;
+            const zonedStart = toZonedTime(new Date(s.start_time), timezone);
+            return zonedStart.getHours() === hour;
           });
 
           return (
@@ -49,6 +53,7 @@ export function DayView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClic
                       }
                       positionColor={(pos as { color?: string } | undefined)?.color}
                       positionName={(pos as { name?: string } | undefined)?.name}
+                      timezone={timezone}
                     />
                   );
                 })}
