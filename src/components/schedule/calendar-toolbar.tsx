@@ -1,6 +1,6 @@
 "use client";
 
-import { format, addWeeks, subWeeks, addDays, subDays } from "date-fns";
+import { format, addWeeks, subWeeks, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
 import {
   ChevronLeft,
   ChevronRight,
@@ -40,10 +40,13 @@ export function CalendarToolbar() {
     setCurrentDate(new Date());
   }
 
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+
   const dateLabel =
     view === "day"
       ? format(currentDate, "EEEE, MMMM d, yyyy")
-      : `${format(currentDate, "MMM d")} - ${format(addDays(currentDate, 6), "MMM d, yyyy")}`;
+      : `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`;
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
