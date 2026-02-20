@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { useMembers, usePositions, type Shift } from "@/hooks/use-shifts";
 import { Badge } from "@/components/ui/badge";
 
-export function ListView({ shifts }: { shifts: Shift[] }) {
+export function ListView({ shifts, onShiftClick }: { shifts: Shift[]; onShiftClick?: (shift: Shift) => void }) {
   const { data: members = [] } = useMembers();
   const { data: positions = [] } = usePositions();
 
@@ -41,7 +41,7 @@ export function ListView({ shifts }: { shifts: Shift[] }) {
               (p: { id: string }) => p.id === shift.position_id
             );
             return (
-              <tr key={shift.id} className="hover:bg-muted/50">
+              <tr key={shift.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => onShiftClick?.(shift)}>
                 <td className="p-3 text-sm">
                   {format(new Date(shift.start_time), "EEE, MMM d")}
                 </td>
