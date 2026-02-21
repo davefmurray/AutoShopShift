@@ -19,7 +19,7 @@ alter type public.notification_type add value 'time_off_denied';
 
 -- Departments (broad groupings like "Front Shop", "Back Shop")
 create table public.departments (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   shop_id uuid not null references public.shops(id) on delete cascade,
   name text not null,
   pto_accrual_rate numeric(6,2) not null default 0,
@@ -35,7 +35,7 @@ alter table public.shop_members
 
 -- Time Off Requests
 create table public.time_off_requests (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   shop_id uuid not null references public.shops(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   start_date date not null,
@@ -55,7 +55,7 @@ create table public.time_off_requests (
 
 -- PTO Balance Adjustments (starting balances, manual corrections, carryover)
 create table public.pto_balance_adjustments (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   shop_id uuid not null references public.shops(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   hours numeric(6,2) not null,
