@@ -85,6 +85,7 @@ export type Database = {
           shop_id: string;
           user_id: string;
           role: Database["public"]["Enums"]["shop_role"];
+          department_id: string | null;
           hourly_rate: number | null;
           max_hours_per_week: number | null;
           is_active: boolean;
@@ -96,6 +97,7 @@ export type Database = {
           shop_id: string;
           user_id: string;
           role?: Database["public"]["Enums"]["shop_role"];
+          department_id?: string | null;
           hourly_rate?: number | null;
           max_hours_per_week?: number | null;
           is_active?: boolean;
@@ -107,6 +109,7 @@ export type Database = {
           shop_id?: string;
           user_id?: string;
           role?: Database["public"]["Enums"]["shop_role"];
+          department_id?: string | null;
           hourly_rate?: number | null;
           max_hours_per_week?: number | null;
           is_active?: boolean;
@@ -513,6 +516,114 @@ export type Database = {
           created_at?: string;
         };
       };
+      departments: {
+        Row: {
+          id: string;
+          shop_id: string;
+          name: string;
+          pto_accrual_rate: number;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          shop_id: string;
+          name: string;
+          pto_accrual_rate?: number;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          shop_id?: string;
+          name?: string;
+          pto_accrual_rate?: number;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      time_off_requests: {
+        Row: {
+          id: string;
+          shop_id: string;
+          user_id: string;
+          start_date: string;
+          end_date: string;
+          hours_requested: number;
+          reason: string | null;
+          is_paid: boolean | null;
+          status: Database["public"]["Enums"]["time_off_request_status"];
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          reviewer_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          shop_id: string;
+          user_id: string;
+          start_date: string;
+          end_date: string;
+          hours_requested: number;
+          reason?: string | null;
+          is_paid?: boolean | null;
+          status?: Database["public"]["Enums"]["time_off_request_status"];
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          reviewer_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          shop_id?: string;
+          user_id?: string;
+          start_date?: string;
+          end_date?: string;
+          hours_requested?: number;
+          reason?: string | null;
+          is_paid?: boolean | null;
+          status?: Database["public"]["Enums"]["time_off_request_status"];
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          reviewer_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      pto_balance_adjustments: {
+        Row: {
+          id: string;
+          shop_id: string;
+          user_id: string;
+          hours: number;
+          reason: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          shop_id: string;
+          user_id: string;
+          hours: number;
+          reason: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          shop_id?: string;
+          user_id?: string;
+          hours?: number;
+          reason?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+      };
       notifications: {
         Row: {
           id: string;
@@ -563,6 +674,10 @@ export type Database = {
         Args: { p_shop_id: string };
         Returns: boolean;
       };
+      get_pto_balance: {
+        Args: { p_shop_id: string; p_user_id: string };
+        Returns: Json;
+      };
     };
     Enums: {
       shop_role: "owner" | "manager" | "technician";
@@ -570,6 +685,7 @@ export type Database = {
       swap_status: "pending" | "approved" | "denied" | "cancelled";
       claim_status: "pending" | "approved" | "denied";
       time_record_status: "clocked_in" | "on_break" | "clocked_out";
+      time_off_request_status: "pending" | "approved" | "denied" | "cancelled";
       shift_action: "create" | "update" | "delete" | "publish" | "unpublish" | "assign" | "unassign";
       notification_type:
         | "shift_published"
@@ -585,7 +701,10 @@ export type Database = {
         | "open_shift_denied"
         | "clock_reminder"
         | "schedule_updated"
-        | "team_invite";
+        | "team_invite"
+        | "time_off_requested"
+        | "time_off_approved"
+        | "time_off_denied";
     };
     CompositeTypes: Record<string, never>;
   };
