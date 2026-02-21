@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useShopStore } from "@/stores/shop-store";
+import { useDepartments, type Department } from "@/hooks/use-time-off";
+import {
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
+} from "@/actions/departments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Trash2 } from "lucide-react";
 
 const TIMEZONES = [
   "America/New_York",
@@ -48,6 +55,16 @@ export default function SettingsPage() {
   const [zip, setZip] = useState("");
   const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState("America/New_York");
+
+  // Department state
+  const { data: departments = [] } = useDepartments();
+  const [newDeptName, setNewDeptName] = useState("");
+  const [newDeptRate, setNewDeptRate] = useState("");
+  const [deptSaving, setDeptSaving] = useState(false);
+  const [deptError, setDeptError] = useState<string | null>(null);
+  const [editingDept, setEditingDept] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editRate, setEditRate] = useState("");
 
   const { isLoading } = useQuery({
     queryKey: ["shop-settings", shopId],
@@ -107,6 +124,58 @@ export default function SettingsPage() {
     setSuccess(true);
     setSaving(false);
     setTimeout(() => setSuccess(false), 3000);
+  }
+
+  async function handleAddDepartment() {
+    if (!shopId || !newDeptName.trim()) return;
+    setDeptSaving(true);
+    setDeptError(null);
+
+    const result = await createDepartment({
+      shop_id: shopId,
+      name: newDeptName.trim(),
+      pto_accrual_rate: newDeptRate ? parseFloat(newDeptRate) : 0,
+    });
+
+    if (result.error) {
+      setDeptError(result.error);
+    } else {
+      setNewDeptName("");
+      setNewDeptRate("");
+      await queryClient.invalidateQueries({ queryKey: ["departments", shopId] });
+    }
+    setDeptSaving(false);
+  }
+
+  async function handleUpdateDepartment(dept: Department) {
+    setDeptSaving(true);
+    setDeptError(null);
+
+    const result = await updateDepartment(dept.id, {
+      name: editName.trim() || dept.name,
+      pto_accrual_rate: editRate ? parseFloat(editRate) : dept.pto_accrual_rate,
+    });
+
+    if (result.error) {
+      setDeptError(result.error);
+    } else {
+      setEditingDept(null);
+      await queryClient.invalidateQueries({ queryKey: ["departments", shopId] });
+    }
+    setDeptSaving(false);
+  }
+
+  async function handleDeleteDepartment(id: string) {
+    setDeptSaving(true);
+    setDeptError(null);
+
+    const result = await deleteDepartment(id);
+    if (result.error) {
+      setDeptError(result.error);
+    } else {
+      await queryClient.invalidateQueries({ queryKey: ["departments", shopId] });
+    }
+    setDeptSaving(false);
   }
 
   if (isLoading) {
@@ -208,6 +277,124 @@ export default function SettingsPage() {
             {saving ? "Saving..." : "Save changes"}
           </Button>
         </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Departments</CardTitle>
+          <CardDescription>
+            Manage departments and their PTO accrual rates (hours earned per week
+            worked)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {departments.length > 0 && (
+            <div className="space-y-2">
+              {departments.map((dept) => (
+                <div
+                  key={dept.id}
+                  className="flex items-center gap-2 rounded-md border p-3"
+                >
+                  {editingDept === dept.id ? (
+                    <>
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Department name"
+                        className="flex-1"
+                      />
+                      <Input
+                        value={editRate}
+                        onChange={(e) => setEditRate(e.target.value)}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="PTO rate"
+                        className="w-28"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleUpdateDepartment(dept)}
+                        disabled={deptSaving}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingDept(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 font-medium">{dept.name}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {dept.pto_accrual_rate} hrs/week
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingDept(dept.id);
+                          setEditName(dept.name);
+                          setEditRate(String(dept.pto_accrual_rate));
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDeleteDepartment(dept.id)}
+                        disabled={deptSaving}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Separator />
+
+          <div className="flex items-end gap-2">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="dept-name">New department</Label>
+              <Input
+                id="dept-name"
+                value={newDeptName}
+                onChange={(e) => setNewDeptName(e.target.value)}
+                placeholder="e.g. Back Shop"
+              />
+            </div>
+            <div className="w-32 space-y-2">
+              <Label htmlFor="dept-rate">PTO rate</Label>
+              <Input
+                id="dept-rate"
+                value={newDeptRate}
+                onChange={(e) => setNewDeptRate(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+              />
+            </div>
+            <Button
+              onClick={handleAddDepartment}
+              disabled={deptSaving || !newDeptName.trim()}
+            >
+              Add
+            </Button>
+          </div>
+
+          {deptError && (
+            <p className="text-sm text-destructive">{deptError}</p>
+          )}
+        </CardContent>
       </Card>
     </div>
   );
