@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { useDepartments } from "@/hooks/use-time-off";
 
 export default function MemberDetailPage() {
   const { memberId } = useParams<{ memberId: string }>();
@@ -35,8 +36,10 @@ export default function MemberDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<string>("");
+  const [departmentId, setDepartmentId] = useState<string>("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [maxHours, setMaxHours] = useState("");
+  const { data: departments = [] } = useDepartments();
 
   const { data: member, isLoading } = useQuery({
     queryKey: ["team-member", memberId],
@@ -75,6 +78,7 @@ export default function MemberDetailPage() {
 
       // Set form state
       setRole((memberData as { role: string }).role);
+      setDepartmentId((memberData as { department_id: string | null }).department_id ?? "");
       setHourlyRate(String((memberData as { hourly_rate: number | null }).hourly_rate ?? ""));
       setMaxHours(String((memberData as { max_hours_per_week: number | null }).max_hours_per_week ?? "40"));
 
@@ -98,6 +102,7 @@ export default function MemberDetailPage() {
       .from("shop_members")
       .update({
         role,
+        department_id: departmentId || null,
         hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
         max_hours_per_week: maxHours ? parseInt(maxHours) : 40,
       })
@@ -167,6 +172,22 @@ export default function MemberDetailPage() {
                 <SelectItem value="technician">Technician</SelectItem>
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="owner">Owner</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Department</Label>
+            <Select value={departmentId} onValueChange={setDepartmentId}>
+              <SelectTrigger>
+                <SelectValue placeholder="No department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">None</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
