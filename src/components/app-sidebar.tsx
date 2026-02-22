@@ -13,6 +13,7 @@ import {
   Wrench,
   ArrowLeftRight,
   BarChart3,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   Sidebar,
@@ -36,6 +37,7 @@ const navItems = [
   { title: "Swaps", href: "/swaps", icon: ArrowLeftRight },
   { title: "Time Off", href: "/time-off", icon: CalendarOff },
   { title: "Reports", href: "/reports", icon: BarChart3 },
+  { title: "Timesheets", href: "/timesheets", icon: FileSpreadsheet },
   { title: "Templates", href: "/templates", icon: LayoutTemplate },
   { title: "Notifications", href: "/notifications", icon: Bell },
   { title: "Settings", href: "/settings", icon: Settings },
@@ -60,7 +62,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={pathname === item.href}>
+                  <SidebarMenuButton asChild isActive={pathname === item.href || pathname.startsWith(item.href + "/")}>
                     <Link href={item.href}>
                       <item.icon />
                       <span>{item.title}</span>
