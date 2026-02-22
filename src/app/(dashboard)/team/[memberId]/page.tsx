@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useShopStore } from "@/stores/shop-store";
@@ -24,20 +24,25 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Archive, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useDepartments, usePtoBalance } from "@/hooks/use-time-off";
 import { useWorkforceMetrics } from "@/hooks/use-reports";
 import { startOfWeek, endOfWeek } from "date-fns";
+import { ArchiveMemberDialog } from "@/components/team/archive-member-dialog";
+import { restoreMember } from "@/actions/members";
 
 export default function MemberDetailPage() {
   const { memberId } = useParams<{ memberId: string }>();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const shopId = useShopStore((s) => s.activeShopId);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<string>("");
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [departmentId, setDepartmentId] = useState<string>("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [maxHours, setMaxHours] = useState("");
@@ -182,6 +187,12 @@ export default function MemberDetailPage() {
           {(member.profile as { full_name: string | null } | null)?.full_name ?? "Team Member"}
         </h1>
       </div>
+
+      {!(member as { is_active: boolean }).is_active && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+          This member is archived and no longer appears on the active roster.
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -341,6 +352,78 @@ export default function MemberDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {(member as { role: string }).role !== "owner" && (
+        <Card className="border-destructive/50">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(member as { is_active: boolean }).is_active ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Archive this member</p>
+                  <p className="text-sm text-muted-foreground">
+                    Remove from the active roster and delete all future shifts.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => setArchiveOpen(true)}
+                >
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archive
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Restore this member</p>
+                  <p className="text-sm text-muted-foreground">
+                    Re-activate this member on the roster. Shifts will need to
+                    be re-scheduled manually.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={restoring}
+                  onClick={async () => {
+                    setRestoring(true);
+                    const result = await restoreMember(memberId);
+                    if (result.error) {
+                      setError(result.error);
+                    } else {
+                      await queryClient.invalidateQueries({
+                        queryKey: ["team-member", memberId],
+                      });
+                      await queryClient.invalidateQueries({
+                        queryKey: ["team"],
+                      });
+                    }
+                    setRestoring(false);
+                  }}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  {restoring ? "Restoring..." : "Restore"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <ArchiveMemberDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        memberId={memberId}
+        memberName={
+          (member.profile as { full_name: string | null } | null)?.full_name ??
+          "this member"
+        }
+        onArchived={() => {
+          router.push("/team");
+        }}
+      />
     </div>
   );
 }
