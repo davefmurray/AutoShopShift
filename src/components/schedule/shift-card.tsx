@@ -32,7 +32,7 @@ export function ShiftCard({
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    borderLeftColor: positionColor,
+    borderLeftColor: shift.color ?? positionColor,
   };
 
   const timeDisplay = `${formatInTimeZone(new Date(shift.start_time), timezone, "h:mm a")} - ${formatInTimeZone(

@@ -205,6 +205,8 @@ export type Database = {
           status: Database["public"]["Enums"]["shift_status"];
           is_open: boolean;
           notes: string | null;
+          color: string | null;
+          recurrence_group_id: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -221,6 +223,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["shift_status"];
           is_open?: boolean;
           notes?: string | null;
+          color?: string | null;
+          recurrence_group_id?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -237,9 +241,80 @@ export type Database = {
           status?: Database["public"]["Enums"]["shift_status"];
           is_open?: boolean;
           notes?: string | null;
+          color?: string | null;
+          recurrence_group_id?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      shift_breaks: {
+        Row: {
+          id: string;
+          shift_id: string;
+          label: string;
+          duration_minutes: number;
+          is_paid: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          shift_id: string;
+          label?: string;
+          duration_minutes?: number;
+          is_paid?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          shift_id?: string;
+          label?: string;
+          duration_minutes?: number;
+          is_paid?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+      };
+      shift_tags: {
+        Row: {
+          id: string;
+          shop_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          shop_id: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          shop_id?: string;
+          name?: string;
+          created_at?: string;
+        };
+      };
+      shift_tag_assignments: {
+        Row: {
+          id: string;
+          shift_id: string;
+          tag_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          shift_id: string;
+          tag_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          shift_id?: string;
+          tag_id?: string;
+          created_at?: string;
         };
       };
       shift_history: {
