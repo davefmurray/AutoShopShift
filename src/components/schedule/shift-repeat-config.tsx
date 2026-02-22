@@ -10,12 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 
 export type RecurrenceConfig = {
   frequency: "weekly" | "biweekly";
   days: number[]; // 0=Sun, 1=Mon, ...
-  endType: "never" | "on_date";
+  endType: "never" | "1_year" | "on_date";
   endDate?: string;
 };
 
@@ -101,29 +102,45 @@ export function ShiftRepeatConfig({ value, onChange }: ShiftRepeatConfigProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Select
+          <div>
+            <div className="text-xs text-muted-foreground mb-1.5">Ends</div>
+            <RadioGroup
               value={value.endType}
               onValueChange={(v) =>
-                update({ endType: v as "never" | "on_date" })
+                update({ endType: v as "never" | "1_year" | "on_date" })
               }
+              className="space-y-2"
             >
-              <SelectTrigger className="h-8 text-sm w-28">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="never">Never ends</SelectItem>
-                <SelectItem value="on_date">Ends on</SelectItem>
-              </SelectContent>
-            </Select>
-            {value.endType === "on_date" && (
-              <Input
-                type="date"
-                value={value.endDate ?? ""}
-                onChange={(e) => update({ endDate: e.target.value })}
-                className="h-8 text-sm flex-1"
-              />
-            )}
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="never" id="end-never" />
+                <Label htmlFor="end-never" className="text-sm font-normal">
+                  Never
+                  <span className="text-muted-foreground ml-1 text-xs">
+                    (generates 1 year of shifts)
+                  </span>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="1_year" id="end-1year" />
+                <Label htmlFor="end-1year" className="text-sm font-normal">
+                  After 1 year
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="on_date" id="end-date" />
+                <Label htmlFor="end-date" className="text-sm font-normal">
+                  On date
+                </Label>
+                {value.endType === "on_date" && (
+                  <Input
+                    type="date"
+                    value={value.endDate ?? ""}
+                    onChange={(e) => update({ endDate: e.target.value })}
+                    className="h-8 text-sm w-40"
+                  />
+                )}
+              </div>
+            </RadioGroup>
           </div>
         </div>
       )}

@@ -13,7 +13,7 @@ type BreakInput = {
 type RecurrenceInput = {
   frequency: "weekly" | "biweekly";
   days: number[]; // 0=Sun, 1=Mon, ...
-  endType: "never" | "on_date";
+  endType: "never" | "1_year" | "on_date";
   endDate?: string;
 };
 
@@ -125,6 +125,26 @@ export async function createShift(data: {
           await supabase.from("shift_breaks").insert(allBreaks);
         }
       }
+
+      // Copy tags to recurring shifts
+      if (tag_ids?.length && recurringShifts.length > 0) {
+        const { data: insertedRecurring } = await supabase
+          .from("shifts")
+          .select("id")
+          .eq("recurrence_group_id", recurrence_group_id!)
+          .neq("id", shift.id);
+
+        if (insertedRecurring?.length) {
+          const allTags = insertedRecurring.flatMap(
+            (rs: { id: string }) =>
+              tag_ids.map((tag_id) => ({
+                shift_id: rs.id,
+                tag_id,
+              }))
+          );
+          await supabase.from("shift_tag_assignments").insert(allTags);
+        }
+      }
     }
   }
 
@@ -191,14 +211,14 @@ function generateRecurringShifts(
   const durationMs = baseEnd.getTime() - baseStart.getTime();
   const baseDay = baseStart.getUTCDay();
 
-  // End date defaults to 2 years from now
+  // End date defaults to 1 year (52 weeks) for both "never" and "1_year"
   const maxDate =
     recurrence.endType === "on_date" && recurrence.endDate
       ? new Date(recurrence.endDate)
-      : addWeeks(baseStart, 104);
+      : addWeeks(baseStart, 52);
 
   const weekStep = recurrence.frequency === "biweekly" ? 2 : 1;
-  const MAX_SHIFTS = 104;
+  const MAX_SHIFTS = 365; // Supports Mon-Fri × 52 weeks = 260 shifts
 
   // For each requested day, compute offset from base day
   for (const targetDay of recurrence.days) {
