@@ -42,7 +42,7 @@ CREATE POLICY "activity_log_select" ON public.activity_log
   FOR SELECT USING (public.is_shop_member(shop_id));
 
 CREATE POLICY "activity_log_insert" ON public.activity_log
-  FOR INSERT WITH CHECK (public.is_shop_admin(shop_id));
+  FOR INSERT WITH CHECK (public.is_shop_member(shop_id));
 
 -- ============================================================
 -- BRIDGE: shift_history → activity_log

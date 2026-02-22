@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { addDays, format, startOfWeek } from "date-fns";
+import { logActivity } from "@/lib/activity-log";
 
 export async function createShiftTemplate(data: {
   shop_id: string;
@@ -13,9 +14,23 @@ export async function createShiftTemplate(data: {
   break_minutes?: number;
 }) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
   const { error } = await supabase.from("shift_templates").insert(data);
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "template",
+    action: "create",
+    actor_id: user.id,
+    description: `Created shift template ${data.name}`,
+  });
+
   revalidatePath("/templates");
   return { success: true };
 }
@@ -43,12 +58,36 @@ export async function updateShiftTemplate(
 
 export async function deleteShiftTemplate(id: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: template } = await supabase
+    .from("shift_templates")
+    .select("shop_id, name")
+    .eq("id", id)
+    .single();
+
   const { error } = await supabase
     .from("shift_templates")
     .delete()
     .eq("id", id);
 
   if (error) return { error: error.message };
+
+  if (template) {
+    const t = template as { shop_id: string; name: string };
+    await logActivity(supabase, {
+      shop_id: t.shop_id,
+      entity_type: "template",
+      entity_id: id,
+      action: "delete",
+      actor_id: user.id,
+      description: `Deleted shift template ${t.name}`,
+    });
+  }
+
   revalidatePath("/templates");
   return { success: true };
 }
@@ -129,6 +168,15 @@ export async function applyScheduleTemplate(
 
   const { error } = await supabase.from("shifts").insert(shifts);
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: shopId,
+    entity_type: "template",
+    entity_id: templateId,
+    action: "apply",
+    actor_id: user.id,
+    description: `Applied schedule template (${shifts.length} shifts)`,
+  });
 
   revalidatePath("/schedule");
   return { success: true, count: shifts.length };

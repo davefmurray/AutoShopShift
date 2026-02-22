@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-log";
 
 export async function requestSwap(data: {
   shop_id: string;
@@ -22,6 +23,17 @@ export async function requestSwap(data: {
   });
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "swap",
+    entity_id: data.requester_shift_id,
+    action: "create",
+    actor_id: user.id,
+    target_user_id: data.target_id,
+    description: "Requested shift swap",
+  });
+
   revalidatePath("/swaps");
   return { success: true };
 }
@@ -46,6 +58,7 @@ export async function approveSwap(swapId: string) {
     target_shift_id: string | null;
     requester_id: string;
     target_id: string | null;
+    shop_id: string;
   };
 
   // Update swap status
@@ -73,6 +86,16 @@ export async function approveSwap(swapId: string) {
       .eq("id", swapData.target_shift_id);
   }
 
+  await logActivity(supabase, {
+    shop_id: swapData.shop_id,
+    entity_type: "swap",
+    entity_id: swapId,
+    action: "approve",
+    actor_id: user.id,
+    target_user_id: swapData.requester_id,
+    description: "Approved shift swap",
+  });
+
   revalidatePath("/schedule");
   revalidatePath("/swaps");
   return { success: true };
@@ -85,6 +108,12 @@ export async function denySwap(swapId: string) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
+  const { data: swap } = await supabase
+    .from("swap_requests")
+    .select("shop_id, requester_id")
+    .eq("id", swapId)
+    .single();
+
   const { error } = await supabase
     .from("swap_requests")
     .update({
@@ -95,6 +124,20 @@ export async function denySwap(swapId: string) {
     .eq("id", swapId);
 
   if (error) return { error: error.message };
+
+  if (swap) {
+    const s = swap as { shop_id: string; requester_id: string };
+    await logActivity(supabase, {
+      shop_id: s.shop_id,
+      entity_type: "swap",
+      entity_id: swapId,
+      action: "deny",
+      actor_id: user.id,
+      target_user_id: s.requester_id,
+      description: "Denied shift swap",
+    });
+  }
+
   revalidatePath("/swaps");
   return { success: true };
 }
@@ -106,6 +149,12 @@ export async function cancelSwap(swapId: string) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
+  const { data: swap } = await supabase
+    .from("swap_requests")
+    .select("shop_id")
+    .eq("id", swapId)
+    .single();
+
   const { error } = await supabase
     .from("swap_requests")
     .update({ status: "cancelled" })
@@ -113,6 +162,19 @@ export async function cancelSwap(swapId: string) {
     .eq("requester_id", user.id);
 
   if (error) return { error: error.message };
+
+  if (swap) {
+    const s = swap as { shop_id: string };
+    await logActivity(supabase, {
+      shop_id: s.shop_id,
+      entity_type: "swap",
+      entity_id: swapId,
+      action: "cancel",
+      actor_id: user.id,
+      description: "Cancelled shift swap",
+    });
+  }
+
   revalidatePath("/swaps");
   return { success: true };
 }

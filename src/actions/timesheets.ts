@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-log";
 
 export async function updatePayPeriodSettings(data: {
   shop_id: string;
@@ -31,6 +32,15 @@ export async function updatePayPeriodSettings(data: {
     .eq("id", data.shop_id);
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "settings",
+    action: "update",
+    actor_id: user.id,
+    description: "Updated pay period settings",
+  });
+
   revalidatePath("/settings");
   return { success: true };
 }
@@ -77,6 +87,15 @@ export async function signTimesheet(data: {
   });
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "timesheet",
+    action: "sign",
+    actor_id: user.id,
+    description: `Signed timesheet ${data.period_start} - ${data.period_end}`,
+  });
+
   return { success: true };
 }
 
@@ -171,7 +190,7 @@ export async function editTimesheetEntry(data: {
 
   if (updateError) return { error: updateError.message };
 
-  // Insert activity log
+  // Insert activity log (existing timesheet-specific log)
   await supabase.from("timesheet_activity_log").insert({
     time_record_id: data.time_record_id,
     shop_id: data.shop_id,
@@ -181,6 +200,21 @@ export async function editTimesheetEntry(data: {
     old_data: { clock_in: existing.clock_in, clock_out: existing.clock_out },
     new_data: { clock_in: data.clock_in, clock_out: data.clock_out },
     notes: data.notes || null,
+  });
+
+  // Global activity log
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "timesheet",
+    entity_id: data.time_record_id,
+    action: "edit",
+    actor_id: user.id,
+    target_user_id: data.user_id,
+    description: "Edited timesheet entry",
+    metadata: {
+      old_data: { clock_in: existing.clock_in, clock_out: existing.clock_out },
+      new_data: { clock_in: data.clock_in, clock_out: data.clock_out },
+    },
   });
 
   // Auto-invalidate signature if one exists for this period
@@ -240,7 +274,7 @@ export async function addTimesheetEntry(data: {
 
   if (insertError) return { error: insertError.message };
 
-  // Insert activity log
+  // Insert activity log (existing timesheet-specific log)
   await supabase.from("timesheet_activity_log").insert({
     time_record_id: newRecord.id,
     shop_id: data.shop_id,
@@ -250,6 +284,17 @@ export async function addTimesheetEntry(data: {
     old_data: null,
     new_data: { clock_in: data.clock_in, clock_out: data.clock_out },
     notes: data.notes || null,
+  });
+
+  // Global activity log
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "timesheet",
+    entity_id: newRecord.id,
+    action: "create",
+    actor_id: user.id,
+    target_user_id: data.user_id,
+    description: "Added timesheet entry",
   });
 
   // Auto-invalidate signature if one exists for this period
