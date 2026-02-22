@@ -202,6 +202,7 @@ export default function MemberTimesheetPage() {
         endDate={periodEnd}
         open={activityPanelOpen}
         onOpenChange={setActivityPanelOpen}
+        timezone={timezone}
       />
     </div>
   );

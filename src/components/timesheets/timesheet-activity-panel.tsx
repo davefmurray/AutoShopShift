@@ -1,6 +1,7 @@
 "use client";
 
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   Sheet,
@@ -17,6 +18,7 @@ type TimesheetActivityPanelProps = {
   endDate: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  timezone: string;
 };
 
 const ACTION_CONFIG: Record<
@@ -28,21 +30,21 @@ const ACTION_CONFIG: Record<
   delete: { label: "Deleted", icon: Trash2, color: "text-red-600" },
 };
 
-function formatTimeValue(value: unknown): string {
+function formatTimeValue(value: unknown, tz: string): string {
   if (!value || typeof value !== "string") return "—";
   try {
-    return format(new Date(value), "h:mm a");
+    return formatInTimeZone(new Date(value), tz, "h:mm a");
   } catch {
     return String(value);
   }
 }
 
-function ChangeSummary({ entry }: { entry: TimesheetActivityEntry }) {
+function ChangeSummary({ entry, timezone }: { entry: TimesheetActivityEntry; timezone: string }) {
   if (entry.action === "create" && entry.new_data) {
     return (
       <p className="text-xs text-muted-foreground">
-        {formatTimeValue(entry.new_data.clock_in)} –{" "}
-        {formatTimeValue(entry.new_data.clock_out)}
+        {formatTimeValue(entry.new_data.clock_in, timezone)} –{" "}
+        {formatTimeValue(entry.new_data.clock_out, timezone)}
       </p>
     );
   }
@@ -51,12 +53,12 @@ function ChangeSummary({ entry }: { entry: TimesheetActivityEntry }) {
     const changes: string[] = [];
     if (entry.old_data.clock_in !== entry.new_data.clock_in) {
       changes.push(
-        `Clock in: ${formatTimeValue(entry.old_data.clock_in)} → ${formatTimeValue(entry.new_data.clock_in)}`
+        `Clock in: ${formatTimeValue(entry.old_data.clock_in, timezone)} → ${formatTimeValue(entry.new_data.clock_in, timezone)}`
       );
     }
     if (entry.old_data.clock_out !== entry.new_data.clock_out) {
       changes.push(
-        `Clock out: ${formatTimeValue(entry.old_data.clock_out)} → ${formatTimeValue(entry.new_data.clock_out)}`
+        `Clock out: ${formatTimeValue(entry.old_data.clock_out, timezone)} → ${formatTimeValue(entry.new_data.clock_out, timezone)}`
       );
     }
     if (changes.length === 0) return null;
@@ -72,7 +74,7 @@ function ChangeSummary({ entry }: { entry: TimesheetActivityEntry }) {
   return null;
 }
 
-function ActivityItem({ entry }: { entry: TimesheetActivityEntry }) {
+function ActivityItem({ entry, timezone }: { entry: TimesheetActivityEntry; timezone: string }) {
   const config = ACTION_CONFIG[entry.action] ?? {
     label: entry.action,
     icon: Pencil,
@@ -93,7 +95,7 @@ function ActivityItem({ entry }: { entry: TimesheetActivityEntry }) {
           <span className="font-medium">{config.label}</span>
           <span className="text-muted-foreground"> by {actorName}</span>
         </div>
-        <ChangeSummary entry={entry} />
+        <ChangeSummary entry={entry} timezone={timezone} />
         {entry.notes && (
           <p className="text-xs text-muted-foreground italic">
             &ldquo;{entry.notes}&rdquo;
@@ -115,6 +117,7 @@ export function TimesheetActivityPanel({
   endDate,
   open,
   onOpenChange,
+  timezone,
 }: TimesheetActivityPanelProps) {
   const { data: entries = [], isLoading } = useTimesheetActivityLog(
     open ? userId : undefined,
@@ -138,7 +141,7 @@ export function TimesheetActivityPanel({
             </p>
           )}
           {entries.map((entry) => (
-            <ActivityItem key={entry.id} entry={entry} />
+            <ActivityItem key={entry.id} entry={entry} timezone={timezone} />
           ))}
         </div>
       </SheetContent>

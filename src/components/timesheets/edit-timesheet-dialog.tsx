@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { useShopStore } from "@/stores/shop-store";
 import { editTimesheetEntry, addTimesheetEntry } from "@/actions/timesheets";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ type EditTimesheetDialogProps = {
 function toLocalTime(isoString: string | null, tz: string): string {
   if (!isoString) return "";
   try {
-    return format(new Date(isoString), "HH:mm");
+    return formatInTimeZone(new Date(isoString), tz, "HH:mm");
   } catch {
     return "";
   }
@@ -68,8 +69,8 @@ export function EditTimesheetDialog({
     setLoading(true);
     setError(null);
 
-    const clockIn = `${row.day_date}T${clockInTime}:00`;
-    const clockOut = `${row.day_date}T${clockOutTime}:00`;
+    const clockIn = fromZonedTime(`${row.day_date}T${clockInTime}:00`, timezone).toISOString();
+    const clockOut = fromZonedTime(`${row.day_date}T${clockOutTime}:00`, timezone).toISOString();
 
     const result = isEdit
       ? await editTimesheetEntry({
@@ -124,9 +125,9 @@ export function EditTimesheetDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           {isEdit && row.clock_in && (
             <p className="text-sm text-muted-foreground">
-              Current: {format(new Date(row.clock_in), "h:mm a")}
+              Current: {formatInTimeZone(new Date(row.clock_in), timezone, "h:mm a")}
               {row.clock_out
-                ? ` – ${format(new Date(row.clock_out), "h:mm a")}`
+                ? ` – ${formatInTimeZone(new Date(row.clock_out), timezone, "h:mm a")}`
                 : ""}
             </p>
           )}
