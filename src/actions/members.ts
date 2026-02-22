@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-log";
 
 export async function archiveMember(memberId: string) {
   const supabase = await createClient();
@@ -67,6 +68,16 @@ export async function archiveMember(memberId: string) {
     .eq("user_id", m.user_id)
     .eq("status", "pending");
 
+  await logActivity(supabase, {
+    shop_id: m.shop_id,
+    entity_type: "member",
+    entity_id: memberId,
+    action: "archive",
+    actor_id: user.id,
+    target_user_id: m.user_id,
+    description: "Archived team member",
+  });
+
   revalidatePath("/team");
   revalidatePath("/schedule");
   revalidatePath("/swaps");
@@ -89,7 +100,7 @@ export async function restoreMember(memberId: string) {
 
   if (!member) return { error: "Member not found" };
 
-  const m = member as { is_active: boolean };
+  const m = member as { is_active: boolean; shop_id: string; user_id: string };
   if (m.is_active) return { error: "Member is already active" };
 
   const { error: updateError } = await supabase
@@ -98,6 +109,16 @@ export async function restoreMember(memberId: string) {
     .eq("id", memberId);
 
   if (updateError) return { error: updateError.message };
+
+  await logActivity(supabase, {
+    shop_id: m.shop_id,
+    entity_type: "member",
+    entity_id: memberId,
+    action: "restore",
+    actor_id: user.id,
+    target_user_id: m.user_id,
+    description: "Restored team member",
+  });
 
   revalidatePath("/team");
   return { success: true };

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-log";
 
 export async function clockIn(shopId: string, shiftId?: string) {
   const supabase = await createClient();
@@ -31,16 +32,30 @@ export async function clockIn(shopId: string, shiftId?: string) {
 
   if (onBreak?.length) return { error: "Already clocked in (on break)" };
 
-  const { error } = await supabase.from("time_records").insert({
-    shop_id: shopId,
-    user_id: user.id,
-    shift_id: shiftId || null,
-    clock_in: new Date().toISOString(),
-    status: "clocked_in",
-    created_by: user.id,
-  });
+  const { data: record, error } = await supabase
+    .from("time_records")
+    .insert({
+      shop_id: shopId,
+      user_id: user.id,
+      shift_id: shiftId || null,
+      clock_in: new Date().toISOString(),
+      status: "clocked_in",
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: shopId,
+    entity_type: "time_record",
+    entity_id: record.id,
+    action: "clock_in",
+    actor_id: user.id,
+    description: "Clocked in",
+  });
+
   revalidatePath("/time-clock");
   return { success: true };
 }
@@ -51,6 +66,13 @@ export async function clockOut(timeRecordId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
+
+  // Fetch time record for shop_id
+  const { data: record } = await supabase
+    .from("time_records")
+    .select("shop_id, user_id")
+    .eq("id", timeRecordId)
+    .single();
 
   // End any active breaks first
   const { data: activeBreaks } = await supabase
@@ -77,12 +99,36 @@ export async function clockOut(timeRecordId: string) {
     .eq("id", timeRecordId);
 
   if (error) return { error: error.message };
+
+  if (record) {
+    const r = record as { shop_id: string; user_id: string };
+    await logActivity(supabase, {
+      shop_id: r.shop_id,
+      entity_type: "time_record",
+      entity_id: timeRecordId,
+      action: "clock_out",
+      actor_id: user.id,
+      target_user_id: r.user_id !== user.id ? r.user_id : undefined,
+      description: "Clocked out",
+    });
+  }
+
   revalidatePath("/time-clock");
   return { success: true };
 }
 
 export async function startBreak(timeRecordId: string, isPaid: boolean = false) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: record } = await supabase
+    .from("time_records")
+    .select("shop_id, user_id")
+    .eq("id", timeRecordId)
+    .single();
 
   // Update time record status
   await supabase
@@ -97,12 +143,35 @@ export async function startBreak(timeRecordId: string, isPaid: boolean = false) 
   });
 
   if (error) return { error: error.message };
+
+  if (record) {
+    const r = record as { shop_id: string; user_id: string };
+    await logActivity(supabase, {
+      shop_id: r.shop_id,
+      entity_type: "time_record",
+      entity_id: timeRecordId,
+      action: "start_break",
+      actor_id: user.id,
+      description: "Started break",
+    });
+  }
+
   revalidatePath("/time-clock");
   return { success: true };
 }
 
 export async function endBreak(timeRecordId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  const { data: record } = await supabase
+    .from("time_records")
+    .select("shop_id, user_id")
+    .eq("id", timeRecordId)
+    .single();
 
   // Find active break
   const { data: activeBreak } = await supabase
@@ -124,6 +193,18 @@ export async function endBreak(timeRecordId: string) {
     .update({ status: "clocked_in" })
     .eq("id", timeRecordId);
 
+  if (record) {
+    const r = record as { shop_id: string; user_id: string };
+    await logActivity(supabase, {
+      shop_id: r.shop_id,
+      entity_type: "time_record",
+      entity_id: timeRecordId,
+      action: "end_break",
+      actor_id: user.id,
+      description: "Ended break",
+    });
+  }
+
   revalidatePath("/time-clock");
   return { success: true };
 }
@@ -141,14 +222,29 @@ export async function createManualEntry(data: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  const { error } = await supabase.from("time_records").insert({
-    ...data,
-    status: "clocked_out",
-    is_manual: true,
-    created_by: user.id,
-  });
+  const { data: record, error } = await supabase
+    .from("time_records")
+    .insert({
+      ...data,
+      status: "clocked_out",
+      is_manual: true,
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "time_record",
+    entity_id: record.id,
+    action: "create",
+    actor_id: user.id,
+    target_user_id: data.user_id !== user.id ? data.user_id : undefined,
+    description: "Manual time entry created",
+  });
+
   revalidatePath("/time-clock");
   return { success: true };
 }

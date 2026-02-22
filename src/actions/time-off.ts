@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createNotification } from "./notifications";
+import { logActivity } from "@/lib/activity-log";
 
 export async function requestTimeOff(data: {
   shop_id: string;
@@ -27,6 +28,14 @@ export async function requestTimeOff(data: {
   });
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "time_off",
+    action: "create",
+    actor_id: user.id,
+    description: `Requested time off ${data.start_date} - ${data.end_date}`,
+  });
 
   // Notify managers/owners
   const { data: profile } = await supabase
@@ -90,6 +99,16 @@ export async function approveTimeOff(requestId: string, isPaid: boolean) {
 
   const reqData = request as { user_id: string; shop_id: string; start_date: string; end_date: string };
 
+  await logActivity(supabase, {
+    shop_id: reqData.shop_id,
+    entity_type: "time_off",
+    entity_id: requestId,
+    action: "approve",
+    actor_id: user.id,
+    target_user_id: reqData.user_id,
+    description: `Approved time off request ${reqData.start_date} - ${reqData.end_date}`,
+  });
+
   await createNotification({
     shop_id: reqData.shop_id,
     user_id: reqData.user_id,
@@ -131,6 +150,16 @@ export async function denyTimeOff(requestId: string, reviewerNotes?: string) {
 
   const reqData = request as { user_id: string; shop_id: string; start_date: string; end_date: string };
 
+  await logActivity(supabase, {
+    shop_id: reqData.shop_id,
+    entity_type: "time_off",
+    entity_id: requestId,
+    action: "deny",
+    actor_id: user.id,
+    target_user_id: reqData.user_id,
+    description: `Denied time off request ${reqData.start_date} - ${reqData.end_date}`,
+  });
+
   await createNotification({
     shop_id: reqData.shop_id,
     user_id: reqData.user_id,
@@ -150,6 +179,12 @@ export async function cancelTimeOff(requestId: string) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
+  const { data: request } = await supabase
+    .from("time_off_requests")
+    .select("shop_id")
+    .eq("id", requestId)
+    .single();
+
   const { error } = await supabase
     .from("time_off_requests")
     .update({ status: "cancelled" })
@@ -158,6 +193,19 @@ export async function cancelTimeOff(requestId: string) {
     .eq("status", "pending");
 
   if (error) return { error: error.message };
+
+  if (request) {
+    const r = request as { shop_id: string };
+    await logActivity(supabase, {
+      shop_id: r.shop_id,
+      entity_type: "time_off",
+      entity_id: requestId,
+      action: "cancel",
+      actor_id: user.id,
+      description: "Cancelled time off request",
+    });
+  }
+
   revalidatePath("/time-off");
   return { success: true };
 }
@@ -183,6 +231,16 @@ export async function adjustPtoBalance(data: {
   });
 
   if (error) return { error: error.message };
+
+  await logActivity(supabase, {
+    shop_id: data.shop_id,
+    entity_type: "pto",
+    action: "adjust",
+    actor_id: user.id,
+    target_user_id: data.user_id,
+    description: `PTO balance adjusted by ${data.hours > 0 ? "+" : ""}${data.hours}h`,
+  });
+
   revalidatePath("/time-off");
   return { success: true };
 }
