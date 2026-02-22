@@ -24,6 +24,7 @@ import { useShopTimezone } from "@/hooks/use-shop-timezone";
 import { PayPeriodNavigator } from "@/components/timesheets/pay-period-navigator";
 import { TimesheetTable } from "@/components/timesheets/timesheet-table";
 import { SignTimesheetDialog } from "@/components/timesheets/sign-timesheet-dialog";
+import { ExportButtons } from "@/components/timesheets/export-buttons";
 
 export default function MemberTimesheetPage() {
   const { memberId } = useParams<{ memberId: string }>();
@@ -66,6 +67,17 @@ export default function MemberTimesheetPage() {
     enabled: !!memberId,
   });
 
+  const { data: shop } = useQuery({
+    queryKey: ["shop-name", shopId],
+    queryFn: async () => {
+      if (!shopId) return null;
+      const supabase = createClient();
+      const { data } = await supabase.from("shops").select("name").eq("id", shopId).single();
+      return data as { name: string } | null;
+    },
+    enabled: !!shopId,
+  });
+
   const { data: rows = [], isLoading: rowsLoading } = useTimesheetBreakdown(
     member?.user_id,
     periodStart,
@@ -105,18 +117,31 @@ export default function MemberTimesheetPage() {
           </Link>
         </Button>
         <h1 className="text-2xl font-bold">{member.full_name}</h1>
-        {canSign && (
-          <SignTimesheetDialog
-            periodStart={periodStart}
-            periodEnd={periodEnd}
-            summary={summary}
-          >
-            <Button size="sm" className="ml-auto">
-              <PenLine className="mr-2 h-4 w-4" />
-              Sign Timesheet
-            </Button>
-          </SignTimesheetDialog>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {rows.length > 0 && (
+            <ExportButtons
+              shopName={shop?.name ?? "Shop"}
+              employeeName={member.full_name}
+              periodStart={periodStart}
+              periodEnd={periodEnd}
+              rows={rows}
+              summary={summary}
+              signature={signature}
+            />
+          )}
+          {canSign && (
+            <SignTimesheetDialog
+              periodStart={periodStart}
+              periodEnd={periodEnd}
+              summary={summary}
+            >
+              <Button size="sm">
+                <PenLine className="mr-2 h-4 w-4" />
+                Sign Timesheet
+              </Button>
+            </SignTimesheetDialog>
+          )}
+        </div>
       </div>
 
       <PayPeriodNavigator
