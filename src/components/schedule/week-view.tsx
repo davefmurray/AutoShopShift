@@ -16,24 +16,39 @@ import {
 import { ShiftCard } from "./shift-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CirclePlus } from "lucide-react";
+import type { useBulkSelection } from "@/hooks/use-bulk-selection";
+
+type BulkSelection = ReturnType<typeof useBulkSelection>;
 
 type WeekViewProps = {
   shifts: Shift[];
   onShiftClick?: (shift: Shift) => void;
   onCellClick?: (userId: string, dateStr: string) => void;
+  bulkMode?: boolean;
+  bulkSelection?: BulkSelection;
 };
 
 // ---------------------------------------------------------------------------
 // GridHeader
 // ---------------------------------------------------------------------------
 
-function GridHeader({ days }: { days: Date[] }) {
+function GridHeader({
+  days,
+  bulkMode,
+  bulkSelection,
+}: {
+  days: Date[];
+  bulkMode?: boolean;
+  bulkSelection?: BulkSelection;
+}) {
   return (
     <div className="flex border-b">
       <div className="w-48 shrink-0" />
       {days.map((day) => {
         const isToday = isSameDay(day, new Date());
+        const dateStr = format(day, "yyyy-MM-dd");
         return (
           <div
             key={day.toISOString()}
@@ -41,6 +56,14 @@ function GridHeader({ days }: { days: Date[] }) {
               isToday ? "bg-primary/10 text-primary" : ""
             }`}
           >
+            {bulkMode && bulkSelection && (
+              <div className="flex justify-center mb-1">
+                <Checkbox
+                  checked={bulkSelection.isDayFullySelected(dateStr)}
+                  onCheckedChange={() => bulkSelection.toggleDay(dateStr)}
+                />
+              </div>
+            )}
             <div>{format(day, "EEE")}</div>
             <div className={isToday ? "font-bold" : "text-muted-foreground"}>
               {format(day, "d")}
@@ -65,6 +88,8 @@ function ShiftCell({
   timezone,
   onShiftClick,
   onCellClick,
+  bulkMode,
+  bulkSelection,
 }: {
   droppableId: string;
   shifts: Shift[];
@@ -74,6 +99,8 @@ function ShiftCell({
   timezone: string;
   onShiftClick?: (shift: Shift) => void;
   onCellClick?: () => void;
+  bulkMode?: boolean;
+  bulkSelection?: BulkSelection;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: droppableId });
 
@@ -83,10 +110,10 @@ function ShiftCell({
   return (
     <div
       ref={setNodeRef}
-      onClick={shifts.length === 0 && dayTimeOff.length === 0 ? onCellClick : undefined}
+      onClick={!bulkMode && shifts.length === 0 && dayTimeOff.length === 0 ? onCellClick : undefined}
       className={`flex-1 min-w-[100px] min-h-[60px] p-1 space-y-1 border-l ${
         isOver ? "bg-primary/10" : ""
-      } ${shifts.length === 0 && dayTimeOff.length === 0 ? "hover:bg-muted/20 cursor-pointer" : ""}`}
+      } ${!bulkMode && shifts.length === 0 && dayTimeOff.length === 0 ? "hover:bg-muted/20 cursor-pointer" : ""}`}
     >
       {dayTimeOff.map((to) => (
         <div
@@ -98,16 +125,32 @@ function ShiftCell({
       ))}
       {shifts.map((shift) => {
         const pos = positions.find((p) => p.id === shift.position_id);
+        const selected = bulkMode && bulkSelection?.isSelected(shift.id);
         return (
-          <ShiftCard
-            key={shift.id}
-            shift={shift}
-            positionColor={pos?.color}
-            positionName={pos?.name}
-            timezone={timezone}
-            compact
-            onClick={() => onShiftClick?.(shift)}
-          />
+          <div key={shift.id} className="relative">
+            {bulkMode && bulkSelection && (
+              <div className="absolute top-1 left-1 z-10">
+                <Checkbox
+                  checked={bulkSelection.isSelected(shift.id)}
+                  onCheckedChange={() => bulkSelection.toggleShift(shift.id)}
+                />
+              </div>
+            )}
+            <div className={selected ? "ring-2 ring-primary rounded-md" : ""}>
+              <ShiftCard
+                shift={shift}
+                positionColor={pos?.color}
+                positionName={pos?.name}
+                timezone={timezone}
+                compact
+                onClick={
+                  bulkMode
+                    ? () => bulkSelection?.toggleShift(shift.id)
+                    : () => onShiftClick?.(shift)
+                }
+              />
+            </div>
+          </div>
         );
       })}
     </div>
@@ -125,6 +168,8 @@ function OpenShiftsRow({
   timezone,
   onShiftClick,
   onCellClick,
+  bulkMode,
+  bulkSelection,
 }: {
   days: Date[];
   shiftsByDate: Map<string, Shift[]>;
@@ -132,10 +177,18 @@ function OpenShiftsRow({
   timezone: string;
   onShiftClick?: (shift: Shift) => void;
   onCellClick?: (userId: string, dateStr: string) => void;
+  bulkMode?: boolean;
+  bulkSelection?: BulkSelection;
 }) {
   return (
     <div className="flex border-b bg-muted/20">
       <div className="w-48 shrink-0 flex items-center gap-2 px-3 py-2 border-r">
+        {bulkMode && bulkSelection && (
+          <Checkbox
+            checked={bulkSelection.isUserFullySelected("__open__")}
+            onCheckedChange={() => bulkSelection.toggleUser("__open__")}
+          />
+        )}
         <CirclePlus className="h-5 w-5 text-green-600" />
         <span className="text-sm font-medium">Open Shifts</span>
       </div>
@@ -152,6 +205,8 @@ function OpenShiftsRow({
             timezone={timezone}
             onShiftClick={onShiftClick}
             onCellClick={() => onCellClick?.("__open__", dateStr)}
+            bulkMode={bulkMode}
+            bulkSelection={bulkSelection}
           />
         );
       })}
@@ -176,6 +231,8 @@ function EmployeeRow({
   timezone,
   onShiftClick,
   onCellClick,
+  bulkMode,
+  bulkSelection,
 }: {
   userId: string;
   name: string;
@@ -189,6 +246,8 @@ function EmployeeRow({
   timezone: string;
   onShiftClick?: (shift: Shift) => void;
   onCellClick?: (userId: string, dateStr: string) => void;
+  bulkMode?: boolean;
+  bulkSelection?: BulkSelection;
 }) {
   const initials = name
     .split(" ")
@@ -207,6 +266,12 @@ function EmployeeRow({
   return (
     <div className="flex border-b hover:bg-muted/5">
       <div className="w-48 shrink-0 flex items-center gap-2 px-3 py-2 border-r">
+        {bulkMode && bulkSelection && (
+          <Checkbox
+            checked={bulkSelection.isUserFullySelected(userId)}
+            onCheckedChange={() => bulkSelection.toggleUser(userId)}
+          />
+        )}
         <Avatar size="sm">
           {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
           <AvatarFallback>{initials}</AvatarFallback>
@@ -231,6 +296,8 @@ function EmployeeRow({
             timezone={timezone}
             onShiftClick={onShiftClick}
             onCellClick={() => onCellClick?.(userId, dateStr)}
+            bulkMode={bulkMode}
+            bulkSelection={bulkSelection}
           />
         );
       })}
@@ -274,7 +341,13 @@ function TotalsRow({
 // WeekView (main export)
 // ---------------------------------------------------------------------------
 
-export function WeekView({ shifts, onShiftClick, onCellClick }: WeekViewProps) {
+export function WeekView({
+  shifts,
+  onShiftClick,
+  onCellClick,
+  bulkMode,
+  bulkSelection,
+}: WeekViewProps) {
   const { currentDate } = useCalendarStore();
   const timezone = useShopTimezone();
   const { data: members = [] } = useMembers();
@@ -340,7 +413,7 @@ export function WeekView({ shifts, onShiftClick, onCellClick }: WeekViewProps) {
   return (
     <div className="border rounded-lg overflow-x-auto">
       <div className="min-w-[840px]">
-        <GridHeader days={days} />
+        <GridHeader days={days} bulkMode={bulkMode} bulkSelection={bulkSelection} />
         <OpenShiftsRow
           days={days}
           shiftsByDate={shiftsByUserDate.get("__open__") ?? new Map()}
@@ -348,6 +421,8 @@ export function WeekView({ shifts, onShiftClick, onCellClick }: WeekViewProps) {
           timezone={timezone}
           onShiftClick={onShiftClick}
           onCellClick={onCellClick}
+          bulkMode={bulkMode}
+          bulkSelection={bulkSelection}
         />
         {members.map(
           (m: {
@@ -369,6 +444,8 @@ export function WeekView({ shifts, onShiftClick, onCellClick }: WeekViewProps) {
               timezone={timezone}
               onShiftClick={onShiftClick}
               onCellClick={onCellClick}
+              bulkMode={bulkMode}
+              bulkSelection={bulkSelection}
             />
           )
         )}

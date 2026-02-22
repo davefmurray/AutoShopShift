@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 
 type ShortcutHandlers = {
   onNewShift?: () => void;
+  onEscape?: () => void;
 };
 
 export function useKeyboardShortcuts(handlers?: ShortcutHandlers) {
@@ -33,6 +34,13 @@ export function useKeyboardShortcuts(handlers?: ShortcutHandlers) {
       const isSchedulePage = pathname === "/schedule";
 
       switch (e.key) {
+        case "Escape":
+          if (isSchedulePage && handlers?.onEscape) {
+            e.preventDefault();
+            handlers.onEscape();
+          }
+          break;
+
         case "n":
         case "N":
           if (isSchedulePage && handlers?.onNewShift) {

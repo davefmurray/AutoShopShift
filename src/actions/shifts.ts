@@ -353,6 +353,97 @@ export async function unpublishShifts(shiftIds: string[]) {
   return { success: true };
 }
 
+export async function bulkUpdateShifts(
+  shiftIds: string[],
+  data: {
+    position_id?: string | null;
+    start_time_of_day?: string; // "HH:mm" — applied to each shift's existing date
+    end_time_of_day?: string; // "HH:mm" — same
+    color?: string | null;
+  }
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  if (shiftIds.length === 0 || shiftIds.length > 500) {
+    return { error: "Must select between 1 and 500 shifts" };
+  }
+
+  const { start_time_of_day, end_time_of_day, ...nonTimeFields } = data;
+
+  // Update non-time fields in a single batch if any are provided
+  const hasNonTimeUpdates = Object.values(nonTimeFields).some(
+    (v) => v !== undefined
+  );
+  if (hasNonTimeUpdates) {
+    const updateData: Record<string, string | null> = {};
+    if (nonTimeFields.position_id !== undefined)
+      updateData.position_id = nonTimeFields.position_id;
+    if (nonTimeFields.color !== undefined)
+      updateData.color = nonTimeFields.color;
+
+    const { error } = await supabase
+      .from("shifts")
+      .update(updateData)
+      .in("id", shiftIds);
+    if (error) return { error: error.message };
+  }
+
+  // Update time fields per-shift (need to preserve each shift's date)
+  if (start_time_of_day !== undefined || end_time_of_day !== undefined) {
+    const { data: existingShifts, error: fetchErr } = await supabase
+      .from("shifts")
+      .select("id, start_time, end_time")
+      .in("id", shiftIds);
+    if (fetchErr) return { error: fetchErr.message };
+
+    for (const shift of existingShifts ?? []) {
+      const updates: Record<string, string> = {};
+      if (start_time_of_day !== undefined) {
+        const dateStr = shift.start_time.split("T")[0];
+        updates.start_time = `${dateStr}T${start_time_of_day}:00`;
+      }
+      if (end_time_of_day !== undefined) {
+        // Use end_time's date (handles overnight shifts)
+        const dateStr = shift.end_time.split("T")[0];
+        updates.end_time = `${dateStr}T${end_time_of_day}:00`;
+      }
+      const { error } = await supabase
+        .from("shifts")
+        .update(updates)
+        .eq("id", shift.id);
+      if (error) return { error: error.message };
+    }
+  }
+
+  revalidatePath("/schedule");
+  return { success: true };
+}
+
+export async function bulkDeleteShifts(shiftIds: string[]) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  if (shiftIds.length === 0 || shiftIds.length > 500) {
+    return { error: "Must select between 1 and 500 shifts" };
+  }
+
+  const { error } = await supabase
+    .from("shifts")
+    .delete()
+    .in("id", shiftIds);
+
+  if (error) return { error: error.message };
+  revalidatePath("/schedule");
+  return { success: true };
+}
+
 export async function assignShift(shiftId: string, userId: string) {
   const supabase = await createClient();
   const { error } = await supabase

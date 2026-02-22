@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { CalendarToolbar } from "@/components/schedule/calendar-toolbar";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { WeekView } from "@/components/schedule/week-view";
@@ -9,8 +9,12 @@ import { ListView } from "@/components/schedule/list-view";
 import { ShiftDialog } from "@/components/schedule/shift-dialog";
 import { CopyWeekDialog } from "@/components/schedule/copy-week-dialog";
 import { PublishBar } from "@/components/schedule/publish-bar";
+import { BulkEditToolbar } from "@/components/schedule/bulk-edit-toolbar";
+import { BulkEditDialog } from "@/components/schedule/bulk-edit-dialog";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useShifts, type Shift } from "@/hooks/use-shifts";
+import { useBulkSelection } from "@/hooks/use-bulk-selection";
+import { useShopTimezone } from "@/hooks/use-shop-timezone";
 import { format, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
 import {
   DndContext,
@@ -23,18 +27,34 @@ import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useShopStore } from "@/stores/shop-store";
 import { Button } from "@/components/ui/button";
-import { Copy, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { bulkDeleteShifts } from "@/actions/shifts";
+import { Copy, Plus, CheckSquare } from "lucide-react";
 
 export default function SchedulePage() {
   const { currentDate, view } = useCalendarStore();
   const shopId = useShopStore((s) => s.activeShopId);
   const queryClient = useQueryClient();
+  const timezone = useShopTimezone();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [defaultUserId, setDefaultUserId] = useState<string | undefined>();
   const [dialogDefaultDate, setDialogDefaultDate] = useState(format(currentDate, "yyyy-MM-dd"));
+
+  // Bulk mode state
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
@@ -49,6 +69,14 @@ export default function SchedulePage() {
       : format(weekEnd, "yyyy-MM-dd'T'HH:mm:ss");
 
   const { data: shifts = [], isLoading } = useShifts(rangeStart, rangeEnd);
+  const bulk = useBulkSelection(shifts, timezone);
+
+  // Auto-exit bulk mode when view or date changes
+  useEffect(() => {
+    setBulkMode(false);
+    bulk.selectNone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, currentDate]);
 
   const handleNewShift = useCallback(() => {
     setEditingShift(null);
@@ -64,21 +92,41 @@ export default function SchedulePage() {
     setDialogOpen(true);
   }
 
+  const handleExitBulkMode = useCallback(() => {
+    setBulkMode(false);
+    bulk.selectNone();
+  }, [bulk]);
+
   const shortcutHandlers = useMemo(
-    () => ({ onNewShift: handleNewShift }),
-    [handleNewShift]
+    () => ({
+      onNewShift: handleNewShift,
+      onEscape: bulkMode ? handleExitBulkMode : undefined,
+    }),
+    [handleNewShift, bulkMode, handleExitBulkMode]
   );
   useKeyboardShortcuts(shortcutHandlers);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { distance: bulkMode ? Infinity : 8 },
     })
   );
 
   function handleEditShift(shift: Shift) {
     setEditingShift(shift);
     setDialogOpen(true);
+  }
+
+  async function handleBulkDelete() {
+    setDeleteLoading(true);
+    const ids = [...bulk.selectedIds];
+    const result = await bulkDeleteShifts(ids);
+    if (!result.error) {
+      await queryClient.invalidateQueries({ queryKey: ["shifts", shopId] });
+      bulk.selectNone();
+    }
+    setDeleteLoading(false);
+    setDeleteConfirmOpen(false);
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -136,20 +184,32 @@ export default function SchedulePage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CalendarToolbar />
         <div className="flex gap-2">
-          {view === "week" && shifts.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => setCopyDialogOpen(true)}
-              className="w-full sm:w-auto"
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Copy Week
+          {!bulkMode && view === "week" && shifts.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setCopyDialogOpen(true)}
+                className="w-full sm:w-auto"
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Week
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setBulkMode(true)}
+                className="w-full sm:w-auto"
+              >
+                <CheckSquare className="mr-2 h-4 w-4" />
+                Bulk Edit
+              </Button>
+            </>
+          )}
+          {!bulkMode && (
+            <Button onClick={handleNewShift} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              New Shift
             </Button>
           )}
-          <Button onClick={handleNewShift} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            New Shift
-          </Button>
         </div>
       </div>
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -158,7 +218,13 @@ export default function SchedulePage() {
             Loading schedule...
           </div>
         ) : view === "week" ? (
-          <WeekView shifts={shifts} onShiftClick={handleEditShift} onCellClick={handleCellClick} />
+          <WeekView
+            shifts={shifts}
+            onShiftClick={bulkMode ? undefined : handleEditShift}
+            onCellClick={bulkMode ? undefined : handleCellClick}
+            bulkMode={bulkMode}
+            bulkSelection={bulkMode ? bulk : undefined}
+          />
         ) : view === "day" ? (
           <DayView shifts={shifts} onShiftClick={handleEditShift} />
         ) : (
@@ -166,7 +232,19 @@ export default function SchedulePage() {
         )}
       </DndContext>
 
-      <PublishBar shifts={shifts} />
+      {bulkMode ? (
+        <BulkEditToolbar
+          selectedCount={bulk.selectedCount}
+          totalCount={shifts.length}
+          onSelectAll={bulk.selectAll}
+          onSelectNone={bulk.selectNone}
+          onEdit={() => setBulkEditDialogOpen(true)}
+          onDelete={() => setDeleteConfirmOpen(true)}
+          onDone={handleExitBulkMode}
+        />
+      ) : (
+        <PublishBar shifts={shifts} />
+      )}
 
       <ShiftDialog
         open={dialogOpen}
@@ -182,6 +260,45 @@ export default function SchedulePage() {
         weekStart={weekStart}
         currentShiftCount={shifts.length}
       />
+
+      <BulkEditDialog
+        open={bulkEditDialogOpen}
+        onOpenChange={setBulkEditDialogOpen}
+        shiftIds={[...bulk.selectedIds]}
+        onSuccess={() => bulk.selectNone()}
+      />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Delete {bulk.selectedCount} Shift{bulk.selectedCount !== 1 ? "s" : ""}?
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={deleteLoading}
+            >
+              {deleteLoading
+                ? "Deleting..."
+                : `Delete ${bulk.selectedCount} Shift${bulk.selectedCount !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
