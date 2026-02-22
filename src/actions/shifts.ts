@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { addDays, addWeeks } from "date-fns";
+import { addDays, addWeeks, endOfWeek, startOfWeek } from "date-fns";
 
 type BreakInput = {
   label: string;
@@ -427,4 +427,150 @@ export async function getShiftHistory(shiftId: string) {
 
   if (error) return { error: error.message };
   return { data: data ?? [] };
+}
+
+export async function copyWeekForward(data: {
+  shop_id: string;
+  source_week_start: string; // ISO date (Sunday)
+  weeks_count: number; // 1–12
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  if (data.weeks_count < 1 || data.weeks_count > 12) {
+    return { error: "Weeks count must be between 1 and 12" };
+  }
+
+  const weekStart = startOfWeek(new Date(data.source_week_start), {
+    weekStartsOn: 0,
+  });
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+
+  // Fetch source shifts
+  const { data: sourceShifts, error: fetchErr } = await supabase
+    .from("shifts")
+    .select("*")
+    .eq("shop_id", data.shop_id)
+    .gte("start_time", weekStart.toISOString())
+    .lte("start_time", weekEnd.toISOString());
+
+  if (fetchErr) return { error: fetchErr.message };
+  if (!sourceShifts?.length) return { error: "No shifts found in source week" };
+  if (sourceShifts.length > 200) {
+    return { error: "Source week has too many shifts (max 200)" };
+  }
+
+  // Build all new shifts across target weeks
+  type NewShift = {
+    shop_id: string;
+    schedule_id: string | null;
+    user_id: string | null;
+    position_id: string | null;
+    start_time: string;
+    end_time: string;
+    break_minutes: number;
+    is_open: boolean;
+    notes: string | null;
+    color: string | null;
+    status: "draft";
+    created_by: string;
+    _source_id: string;
+  };
+  const newShifts: NewShift[] = [];
+
+  for (let w = 1; w <= data.weeks_count; w++) {
+    for (const shift of sourceShifts) {
+      newShifts.push({
+        shop_id: shift.shop_id,
+        schedule_id: shift.schedule_id,
+        user_id: shift.user_id,
+        position_id: shift.position_id,
+        start_time: addWeeks(new Date(shift.start_time), w).toISOString(),
+        end_time: addWeeks(new Date(shift.end_time), w).toISOString(),
+        break_minutes: shift.break_minutes,
+        is_open: shift.is_open,
+        notes: shift.notes,
+        color: shift.color,
+        status: "draft",
+        created_by: user.id,
+        _source_id: shift.id,
+      });
+    }
+  }
+
+  // Insert shifts (strip _source_id before insert)
+  const toInsert = newShifts.map(
+    ({ _source_id: _, ...rest }) => rest
+  );
+  const { data: inserted, error: insertErr } = await supabase
+    .from("shifts")
+    .insert(toInsert)
+    .select("id");
+
+  if (insertErr) return { error: insertErr.message };
+  if (!inserted?.length) return { error: "Failed to insert shifts" };
+
+  // Map inserted IDs back to source IDs for breaks/tags
+  const sourceIds = [...new Set(newShifts.map((s) => s._source_id))];
+
+  const { data: sourceBreaks } = await supabase
+    .from("shift_breaks")
+    .select("*")
+    .in("shift_id", sourceIds);
+
+  const { data: sourceTags } = await supabase
+    .from("shift_tag_assignments")
+    .select("*")
+    .in("shift_id", sourceIds);
+
+  if (sourceBreaks?.length || sourceTags?.length) {
+    const allBreaks: Array<{
+      shift_id: string;
+      label: string;
+      duration_minutes: number;
+      is_paid: boolean;
+      sort_order: number;
+    }> = [];
+    const allTags: Array<{ shift_id: string; tag_id: string }> = [];
+
+    for (let i = 0; i < inserted.length; i++) {
+      const newShiftId = inserted[i].id;
+      const sourceId = newShifts[i]._source_id;
+
+      if (sourceBreaks?.length) {
+        for (const brk of sourceBreaks.filter(
+          (b: { shift_id: string }) => b.shift_id === sourceId
+        )) {
+          allBreaks.push({
+            shift_id: newShiftId,
+            label: brk.label,
+            duration_minutes: brk.duration_minutes,
+            is_paid: brk.is_paid,
+            sort_order: brk.sort_order,
+          });
+        }
+      }
+
+      if (sourceTags?.length) {
+        for (const tag of sourceTags.filter(
+          (t: { shift_id: string }) => t.shift_id === sourceId
+        )) {
+          allTags.push({ shift_id: newShiftId, tag_id: tag.tag_id });
+        }
+      }
+    }
+
+    if (allBreaks.length) {
+      await supabase.from("shift_breaks").insert(allBreaks);
+    }
+    if (allTags.length) {
+      await supabase.from("shift_tag_assignments").insert(allTags);
+    }
+  }
+
+  revalidatePath("/schedule");
+  return { success: true, count: inserted.length };
 }

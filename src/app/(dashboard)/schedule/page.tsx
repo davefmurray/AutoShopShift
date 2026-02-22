@@ -7,6 +7,7 @@ import { WeekView } from "@/components/schedule/week-view";
 import { DayView } from "@/components/schedule/day-view";
 import { ListView } from "@/components/schedule/list-view";
 import { ShiftDialog } from "@/components/schedule/shift-dialog";
+import { CopyWeekDialog } from "@/components/schedule/copy-week-dialog";
 import { PublishBar } from "@/components/schedule/publish-bar";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useShifts, type Shift } from "@/hooks/use-shifts";
@@ -22,7 +23,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useShopStore } from "@/stores/shop-store";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Copy, Plus } from "lucide-react";
 
 export default function SchedulePage() {
   const { currentDate, view } = useCalendarStore();
@@ -30,6 +31,7 @@ export default function SchedulePage() {
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [defaultUserId, setDefaultUserId] = useState<string | undefined>();
   const [dialogDefaultDate, setDialogDefaultDate] = useState(format(currentDate, "yyyy-MM-dd"));
@@ -133,10 +135,22 @@ export default function SchedulePage() {
     <div className="space-y-4 pb-16">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CalendarToolbar />
-        <Button onClick={handleNewShift} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          New Shift
-        </Button>
+        <div className="flex gap-2">
+          {view === "week" && shifts.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setCopyDialogOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copy Week
+            </Button>
+          )}
+          <Button onClick={handleNewShift} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            New Shift
+          </Button>
+        </div>
       </div>
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         {isLoading ? (
@@ -160,6 +174,13 @@ export default function SchedulePage() {
         shift={editingShift}
         defaultDate={dialogDefaultDate}
         defaultUserId={defaultUserId}
+      />
+
+      <CopyWeekDialog
+        open={copyDialogOpen}
+        onOpenChange={setCopyDialogOpen}
+        weekStart={weekStart}
+        currentShiftCount={shifts.length}
       />
     </div>
   );
