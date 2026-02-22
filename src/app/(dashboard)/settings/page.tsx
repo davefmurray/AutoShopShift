@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useShopStore } from "@/stores/shop-store";
+import { useUser } from "@/hooks/use-user";
 import { useDepartments, type Department } from "@/hooks/use-time-off";
 import {
   createDepartment,
@@ -31,7 +32,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Trash2 } from "lucide-react";
+import { ActivityLogFeed } from "@/components/settings/activity-log-feed";
 
 const TIMEZONES = [
   "America/New_York",
@@ -46,6 +54,10 @@ const TIMEZONES = [
 export default function SettingsPage() {
   const shopId = useShopStore((s) => s.activeShopId);
   const queryClient = useQueryClient();
+  const { data: currentUser } = useUser(shopId ?? undefined);
+  const isAdmin =
+    currentUser?.role === "owner" || currentUser?.role === "manager";
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -214,251 +226,268 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-bold">Settings</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Shop Details</CardTitle>
-          <CardDescription>
-            Update your shop name, address, and timezone
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form id="settings-form" onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="shop-name">Shop name</Label>
-              <Input
-                id="shop-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-            <Separator />
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
-                <Input
-                  id="state"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  maxLength={2}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="zip">ZIP</Label>
-                <Input
-                  id="zip"
-                  value={zip}
-                  onChange={(e) => setZip(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-            <Separator />
-            <div className="space-y-2">
-              <Label htmlFor="tz">Timezone</Label>
-              <Select value={timezone} onValueChange={setTimezone}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz.replace("_", " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
-        </CardContent>
-        <CardFooter className="flex items-center justify-between">
-          <div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {success && (
-              <p className="text-sm text-green-600">Settings saved!</p>
-            )}
-          </div>
-          <Button type="submit" form="settings-form" disabled={saving}>
-            {saving ? "Saving..." : "Save changes"}
-          </Button>
-        </CardFooter>
-      </Card>
+      <Tabs defaultValue="general">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="activity-log">Activity Log</TabsTrigger>
+          )}
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pay Period</CardTitle>
-          <CardDescription>
-            Configure your pay period for timesheet calculations
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="week-start">Week starts on</Label>
-            <Select
-              value={String(weekStartDay)}
-              onValueChange={(v) => setWeekStartDay(Number(v))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => (
-                  <SelectItem key={i} value={String(i)}>{day}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-        <CardFooter className="flex items-center justify-between">
-          <div>
-            {payPeriodSuccess && <p className="text-sm text-green-600">Pay period settings saved!</p>}
-          </div>
-          <Button onClick={handleSavePayPeriod} disabled={payPeriodSaving}>
-            {payPeriodSaving ? "Saving..." : "Save"}
-          </Button>
-        </CardFooter>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Departments</CardTitle>
-          <CardDescription>
-            Manage departments and their PTO accrual rates (hours earned per week
-            worked)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {departments.length > 0 && (
-            <div className="space-y-2">
-              {departments.map((dept) => (
-                <div
-                  key={dept.id}
-                  className="flex items-center gap-2 rounded-md border p-3"
-                >
-                  {editingDept === dept.id ? (
-                    <>
-                      <Input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        placeholder="Department name"
-                        className="flex-1"
-                      />
-                      <Input
-                        value={editRate}
-                        onChange={(e) => setEditRate(e.target.value)}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="PTO rate"
-                        className="w-28"
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => handleUpdateDepartment(dept)}
-                        disabled={deptSaving}
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingDept(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="flex-1 font-medium">{dept.name}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {dept.pto_accrual_rate} hrs/week
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingDept(dept.id);
-                          setEditName(dept.name);
-                          setEditRate(String(dept.pto_accrual_rate));
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteDepartment(dept.id)}
-                        disabled={deptSaving}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </>
-                  )}
+        <TabsContent value="general" className="space-y-6 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Shop Details</CardTitle>
+              <CardDescription>
+                Update your shop name, address, and timezone
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form id="settings-form" onSubmit={handleSave} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="shop-name">Shop name</Label>
+                  <Input
+                    id="shop-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
                 </div>
-              ))}
-            </div>
-          )}
+                <Separator />
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State</Label>
+                    <Input
+                      id="state"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      maxLength={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="zip">ZIP</Label>
+                    <Input
+                      id="zip"
+                      value={zip}
+                      onChange={(e) => setZip(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <Label htmlFor="tz">Timezone</Label>
+                  <Select value={timezone} onValueChange={setTimezone}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEZONES.map((tz) => (
+                        <SelectItem key={tz} value={tz}>
+                          {tz.replace("_", " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </form>
+            </CardContent>
+            <CardFooter className="flex items-center justify-between">
+              <div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                {success && (
+                  <p className="text-sm text-green-600">Settings saved!</p>
+                )}
+              </div>
+              <Button type="submit" form="settings-form" disabled={saving}>
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+            </CardFooter>
+          </Card>
 
-          <Separator />
+          <Card>
+            <CardHeader>
+              <CardTitle>Pay Period</CardTitle>
+              <CardDescription>
+                Configure your pay period for timesheet calculations
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="week-start">Week starts on</Label>
+                <Select
+                  value={String(weekStartDay)}
+                  onValueChange={(v) => setWeekStartDay(Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => (
+                      <SelectItem key={i} value={String(i)}>{day}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+            <CardFooter className="flex items-center justify-between">
+              <div>
+                {payPeriodSuccess && <p className="text-sm text-green-600">Pay period settings saved!</p>}
+              </div>
+              <Button onClick={handleSavePayPeriod} disabled={payPeriodSaving}>
+                {payPeriodSaving ? "Saving..." : "Save"}
+              </Button>
+            </CardFooter>
+          </Card>
 
-          <div className="flex items-end gap-2">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="dept-name">New department</Label>
-              <Input
-                id="dept-name"
-                value={newDeptName}
-                onChange={(e) => setNewDeptName(e.target.value)}
-                placeholder="e.g. Back Shop"
-              />
-            </div>
-            <div className="w-32 space-y-2">
-              <Label htmlFor="dept-rate">PTO rate</Label>
-              <Input
-                id="dept-rate"
-                value={newDeptRate}
-                onChange={(e) => setNewDeptRate(e.target.value)}
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-              />
-            </div>
-            <Button
-              onClick={handleAddDepartment}
-              disabled={deptSaving || !newDeptName.trim()}
-            >
-              Add
-            </Button>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Departments</CardTitle>
+              <CardDescription>
+                Manage departments and their PTO accrual rates (hours earned per week
+                worked)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {departments.length > 0 && (
+                <div className="space-y-2">
+                  {departments.map((dept) => (
+                    <div
+                      key={dept.id}
+                      className="flex items-center gap-2 rounded-md border p-3"
+                    >
+                      {editingDept === dept.id ? (
+                        <>
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Department name"
+                            className="flex-1"
+                          />
+                          <Input
+                            value={editRate}
+                            onChange={(e) => setEditRate(e.target.value)}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="PTO rate"
+                            className="w-28"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpdateDepartment(dept)}
+                            disabled={deptSaving}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingDept(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 font-medium">{dept.name}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {dept.pto_accrual_rate} hrs/week
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingDept(dept.id);
+                              setEditName(dept.name);
+                              setEditRate(String(dept.pto_accrual_rate));
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteDepartment(dept.id)}
+                            disabled={deptSaving}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          {deptError && (
-            <p className="text-sm text-destructive">{deptError}</p>
-          )}
-        </CardContent>
-      </Card>
+              <Separator />
+
+              <div className="flex items-end gap-2">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="dept-name">New department</Label>
+                  <Input
+                    id="dept-name"
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    placeholder="e.g. Back Shop"
+                  />
+                </div>
+                <div className="w-32 space-y-2">
+                  <Label htmlFor="dept-rate">PTO rate</Label>
+                  <Input
+                    id="dept-rate"
+                    value={newDeptRate}
+                    onChange={(e) => setNewDeptRate(e.target.value)}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                  />
+                </div>
+                <Button
+                  onClick={handleAddDepartment}
+                  disabled={deptSaving || !newDeptName.trim()}
+                >
+                  Add
+                </Button>
+              </div>
+
+              {deptError && (
+                <p className="text-sm text-destructive">{deptError}</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="activity-log" className="mt-4">
+            <ActivityLogFeed />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
