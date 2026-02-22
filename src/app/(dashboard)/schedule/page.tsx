@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { CalendarToolbar } from "@/components/schedule/calendar-toolbar";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { WeekView } from "@/components/schedule/week-view";
@@ -48,12 +48,12 @@ export default function SchedulePage() {
 
   const { data: shifts = [], isLoading } = useShifts(rangeStart, rangeEnd);
 
-  function handleNewShift() {
+  const handleNewShift = useCallback(() => {
     setEditingShift(null);
     setDefaultUserId(undefined);
     setDialogDefaultDate(format(currentDate, "yyyy-MM-dd"));
     setDialogOpen(true);
-  }
+  }, [currentDate]);
 
   function handleCellClick(userId: string, dateStr: string) {
     setEditingShift(null);
@@ -64,7 +64,7 @@ export default function SchedulePage() {
 
   const shortcutHandlers = useMemo(
     () => ({ onNewShift: handleNewShift }),
-    []
+    [handleNewShift]
   );
   useKeyboardShortcuts(shortcutHandlers);
 
