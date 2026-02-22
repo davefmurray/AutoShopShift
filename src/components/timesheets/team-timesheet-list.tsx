@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { TimesheetSignature } from "@/types/timesheets";
@@ -31,7 +32,9 @@ export function TeamTimesheetList({
   void periodStart;
   void periodEnd;
 
-  const signedUserIds = new Set(signatures.map((s) => s.user_id));
+  const signatureByUserId = new Map(
+    signatures.map((s) => [s.user_id, s])
+  );
 
   return (
     <Card>
@@ -67,8 +70,21 @@ export function TeamTimesheetList({
                   {(m.time_off_hours ?? 0).toFixed(1)}
                 </td>
                 <td className="p-3 text-right">
-                  {signedUserIds.has(m.user_id) ? (
-                    <Badge variant="default">Signed</Badge>
+                  {signatureByUserId.has(m.user_id) ? (
+                    <Badge variant="default" title={
+                      `Signed ${format(
+                        new Date(signatureByUserId.get(m.user_id)!.signed_at),
+                        "MMM d, yyyy"
+                      )}`
+                    }>
+                      Signed{" "}
+                      <span className="ml-1 text-xs opacity-80">
+                        {format(
+                          new Date(signatureByUserId.get(m.user_id)!.signed_at),
+                          "M/d"
+                        )}
+                      </span>
+                    </Badge>
                   ) : (
                     <Badge variant="secondary">Unsigned</Badge>
                   )}

@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PenLine } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { useShopStore } from "@/stores/shop-store";
+import { useUser } from "@/hooks/use-user";
 import {
   usePayPeriodSettings,
   useTimesheetBreakdown,
@@ -21,9 +23,12 @@ import {
 import { useShopTimezone } from "@/hooks/use-shop-timezone";
 import { PayPeriodNavigator } from "@/components/timesheets/pay-period-navigator";
 import { TimesheetTable } from "@/components/timesheets/timesheet-table";
+import { SignTimesheetDialog } from "@/components/timesheets/sign-timesheet-dialog";
 
 export default function MemberTimesheetPage() {
   const { memberId } = useParams<{ memberId: string }>();
+  const shopId = useShopStore((s) => s.activeShopId);
+  const { data: currentUser } = useUser(shopId ?? undefined);
   const { data: paySettings } = usePayPeriodSettings();
   const timezone = useShopTimezone();
 
@@ -88,6 +93,9 @@ export default function MemberTimesheetPage() {
     return <div className="text-muted-foreground">Member not found</div>;
   }
 
+  const isOwnTimesheet = currentUser?.id === member.user_id;
+  const canSign = isOwnTimesheet && !signature;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -97,6 +105,18 @@ export default function MemberTimesheetPage() {
           </Link>
         </Button>
         <h1 className="text-2xl font-bold">{member.full_name}</h1>
+        {canSign && (
+          <SignTimesheetDialog
+            periodStart={periodStart}
+            periodEnd={periodEnd}
+            summary={summary}
+          >
+            <Button size="sm" className="ml-auto">
+              <PenLine className="mr-2 h-4 w-4" />
+              Sign Timesheet
+            </Button>
+          </SignTimesheetDialog>
+        )}
       </div>
 
       <PayPeriodNavigator
