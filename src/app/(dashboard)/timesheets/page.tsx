@@ -39,6 +39,17 @@ export default function TimesheetsPage() {
   const periodStart = format(currentPeriod.start, "yyyy-MM-dd");
   const periodEnd = format(currentPeriod.end, "yyyy-MM-dd");
 
+  const { data: shop } = useQuery({
+    queryKey: ["shop-name", shopId],
+    queryFn: async () => {
+      if (!shopId) return null;
+      const supabase = createClient();
+      const { data } = await supabase.from("shops").select("name").eq("id", shopId).single();
+      return data as { name: string } | null;
+    },
+    enabled: !!shopId,
+  });
+
   const isAdmin =
     currentUser?.role === "owner" || currentUser?.role === "manager";
 
@@ -115,6 +126,7 @@ export default function TimesheetsPage() {
             periodStart={periodStart}
             periodEnd={periodEnd}
             signatures={teamSignatures}
+            shopName={shop?.name}
           />
         )
       ) : ownLoading ? (
