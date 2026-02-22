@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequestTimeOffDialog } from "@/components/time-off/request-dialog";
 import { RequestCard } from "@/components/time-off/request-card";
 import { ApprovalDialog } from "@/components/time-off/approval-dialog";
+import { PtoLedger } from "@/components/time-off/pto-ledger";
+import { BalanceAdjustmentDialog } from "@/components/time-off/balance-adjustment-dialog";
 import { Plus } from "lucide-react";
 
 export default function TimeOffPage() {
@@ -31,6 +33,10 @@ export default function TimeOffPage() {
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [approvalRequest, setApprovalRequest] = useState<TimeOffRequest | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
 
   const isAdmin = currentUser?.role === "owner" || currentUser?.role === "manager";
   const userId = currentUser?.id;
@@ -129,6 +135,7 @@ export default function TimeOffPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="all">All Requests</TabsTrigger>
+          <TabsTrigger value="ledger">Ledger</TabsTrigger>
           {isAdmin && <TabsTrigger value="team">Team Balances</TabsTrigger>}
         </TabsList>
 
@@ -174,6 +181,10 @@ export default function TimeOffPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="ledger">
+          <PtoLedger />
+        </TabsContent>
+
         {isAdmin && (
           <TabsContent value="team">
             <Card>
@@ -186,6 +197,7 @@ export default function TimeOffPage() {
                       <th className="p-3 font-medium text-right">Used</th>
                       <th className="p-3 font-medium text-right">Pending</th>
                       <th className="p-3 font-medium text-right">Available</th>
+                      <th className="p-3 font-medium text-right">Adjust</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -198,12 +210,26 @@ export default function TimeOffPage() {
                         <td className="p-3 text-right font-medium">
                           {member.hours_available}
                         </td>
+                        <td className="p-3 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setAdjustTarget({
+                                userId: member.user_id,
+                                name: member.full_name,
+                              })
+                            }
+                          >
+                            Adjust
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                     {teamBalances.length === 0 && (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           className="p-8 text-center text-muted-foreground"
                         >
                           No team members found.
@@ -230,6 +256,17 @@ export default function TimeOffPage() {
           if (!open) setApprovalRequest(null);
         }}
       />
+
+      {adjustTarget && (
+        <BalanceAdjustmentDialog
+          userId={adjustTarget.userId}
+          userName={adjustTarget.name}
+          open={!!adjustTarget}
+          onOpenChange={(open) => {
+            if (!open) setAdjustTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }
