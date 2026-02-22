@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useShopStore } from "@/stores/shop-store";
-import type { TimesheetDayRow, TimesheetSignature, TimesheetSummary } from "@/types/timesheets";
+import type { TimesheetActivityEntry, TimesheetDayRow, TimesheetSignature, TimesheetSummary } from "@/types/timesheets";
 import { getPayPeriodSettings } from "@/lib/pay-period";
 
 export function useTimesheetBreakdown(
@@ -97,6 +97,31 @@ export function usePayPeriodSettings() {
       return getPayPeriodSettings((data?.settings as Record<string, unknown>) ?? null);
     },
     enabled: !!shopId,
+  });
+}
+
+export function useTimesheetActivityLog(
+  userId: string | undefined,
+  startDate: string,
+  endDate: string
+) {
+  const shopId = useShopStore((s) => s.activeShopId);
+
+  return useQuery({
+    queryKey: ["timesheet-activity-log", shopId, userId, startDate, endDate],
+    queryFn: async (): Promise<TimesheetActivityEntry[]> => {
+      if (!shopId || !userId) return [];
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("get_timesheet_activity_log", {
+        p_shop_id: shopId,
+        p_user_id: userId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
+      if (error) return [];
+      return (data as unknown as TimesheetActivityEntry[]) ?? [];
+    },
+    enabled: !!shopId && !!userId && !!startDate && !!endDate,
   });
 }
 
