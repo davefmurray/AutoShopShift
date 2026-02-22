@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type {
   TimesheetDayRow,
@@ -14,6 +14,8 @@ type TimesheetTableProps = {
   rows: TimesheetDayRow[];
   summary: TimesheetSummary;
   signature?: TimesheetSignature | null;
+  isAdmin?: boolean;
+  onEditRow?: (row: TimesheetDayRow) => void;
 };
 
 function formatHours(h: number): string {
@@ -41,6 +43,8 @@ export function TimesheetTable({
   rows,
   summary,
   signature,
+  isAdmin,
+  onEditRow,
 }: TimesheetTableProps) {
   const totalWorked = rows.reduce((sum, r) => sum + r.total_worked_hours, 0);
   const totalScheduled = rows.reduce((sum, r) => sum + r.scheduled_hours, 0);
@@ -101,6 +105,16 @@ export function TimesheetTable({
                     new Date(row.day_date + "T00:00:00"),
                     "EEE M/d"
                   );
+                  // Editable if admin and row has clock_in or shift_start (not PTO)
+                  const editable =
+                    isAdmin &&
+                    onEditRow &&
+                    !row.is_time_off &&
+                    (!!row.clock_in || !!row.shift_start);
+                  const rowClick = editable ? () => onEditRow(row) : undefined;
+                  const editableClass = editable
+                    ? "cursor-pointer hover:bg-muted/50 group"
+                    : "";
 
                   // PTO day
                   if (row.is_time_off) {
@@ -143,8 +157,19 @@ export function TimesheetTable({
                     if (row.position_name) details.push(row.position_name);
 
                     return (
-                      <tr key={row.day_date} className="border-b last:border-0">
-                        <td className="p-3">{dayLabel}</td>
+                      <tr
+                        key={row.day_date}
+                        className={`border-b last:border-0 ${editableClass}`}
+                        onClick={rowClick}
+                      >
+                        <td className="p-3">
+                          <span className="flex items-center gap-1.5">
+                            {dayLabel}
+                            {editable && (
+                              <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </span>
+                        </td>
                         <td className="p-3">{clockIn}</td>
                         <td className="p-3">{clockOut}</td>
                         <td className="p-3">
@@ -173,8 +198,19 @@ export function TimesheetTable({
                   // Scheduled-only (no clock in but has shift)
                   if (row.shift_start) {
                     return (
-                      <tr key={row.day_date} className="border-b last:border-0">
-                        <td className="p-3">{dayLabel}</td>
+                      <tr
+                        key={row.day_date}
+                        className={`border-b last:border-0 ${editableClass}`}
+                        onClick={rowClick}
+                      >
+                        <td className="p-3">
+                          <span className="flex items-center gap-1.5">
+                            {dayLabel}
+                            {editable && (
+                              <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </span>
+                        </td>
                         <td className="p-3 text-muted-foreground">{"\u2014"}</td>
                         <td className="p-3 text-muted-foreground">{"\u2014"}</td>
                         <td className="p-3 text-muted-foreground">{"\u2014"}</td>
