@@ -97,10 +97,42 @@ export function useMembers() {
         .select("id, full_name, avatar_url")
         .in("id", userIds);
 
-      return members.map((m: { user_id: string; id: string; role: string }) => ({
-        ...m,
-        profile: (profiles ?? []).find((p: { id: string }) => p.id === m.user_id),
-      }));
+      return members.map(
+        (m: { user_id: string; id: string; role: string; max_hours_per_week: number | null }) => ({
+          ...m,
+          profile: (profiles ?? []).find((p: { id: string }) => p.id === m.user_id),
+        })
+      );
+    },
+    enabled: !!shopId,
+  });
+}
+
+export type WeekTimeOff = {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+  is_paid: boolean | null;
+};
+
+export function useWeekTimeOff(startDate: string, endDate: string) {
+  const shopId = useShopStore((s) => s.activeShopId);
+
+  return useQuery({
+    queryKey: ["week-time-off", shopId, startDate, endDate],
+    queryFn: async (): Promise<WeekTimeOff[]> => {
+      if (!shopId) return [];
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("time_off_requests")
+        .select("id, user_id, start_date, end_date, reason, is_paid")
+        .eq("shop_id", shopId)
+        .eq("status", "approved")
+        .lte("start_date", endDate)
+        .gte("end_date", startDate);
+      return (data as WeekTimeOff[]) ?? [];
     },
     enabled: !!shopId,
   });

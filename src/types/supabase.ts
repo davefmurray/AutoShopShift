@@ -678,6 +678,27 @@ export type Database = {
         Args: { p_shop_id: string; p_user_id: string };
         Returns: Json;
       };
+      get_workforce_metrics: {
+        Args: {
+          p_shop_id: string;
+          p_user_id: string;
+          p_start_date: string;
+          p_end_date: string;
+        };
+        Returns: Json;
+      };
+      get_pto_ledger: {
+        Args: { p_shop_id: string; p_user_id: string };
+        Returns: Json;
+      };
+      get_team_workforce_summary: {
+        Args: {
+          p_shop_id: string;
+          p_start_date: string;
+          p_end_date: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       shop_role: "owner" | "manager" | "technician";

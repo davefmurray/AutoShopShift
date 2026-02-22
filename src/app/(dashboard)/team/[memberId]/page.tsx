@@ -26,7 +26,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { useDepartments } from "@/hooks/use-time-off";
+import { useDepartments, usePtoBalance } from "@/hooks/use-time-off";
+import { useWorkforceMetrics } from "@/hooks/use-reports";
+import { startOfWeek, endOfWeek } from "date-fns";
 
 export default function MemberDetailPage() {
   const { memberId } = useParams<{ memberId: string }>();
@@ -40,6 +42,31 @@ export default function MemberDetailPage() {
   const [hourlyRate, setHourlyRate] = useState("");
   const [maxHours, setMaxHours] = useState("");
   const { data: departments = [] } = useDepartments();
+
+  // Resolve user_id for metric hooks (needs member data)
+  const { data: memberUserId } = useQuery({
+    queryKey: ["team-member-userid", memberId],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("shop_members")
+        .select("user_id")
+        .eq("id", memberId)
+        .single();
+      return (data as { user_id: string } | null)?.user_id ?? null;
+    },
+    enabled: !!memberId,
+  });
+
+  const now = new Date();
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
+  const { data: weekMetrics } = useWorkforceMetrics(
+    memberUserId ?? undefined,
+    weekStart,
+    weekEnd
+  );
+  const { data: ptoBalance } = usePtoBalance(memberUserId ?? undefined);
 
   const { data: member, isLoading } = useQuery({
     queryKey: ["team-member", memberId],
@@ -78,7 +105,7 @@ export default function MemberDetailPage() {
 
       // Set form state
       setRole((memberData as { role: string }).role);
-      setDepartmentId((memberData as { department_id: string | null }).department_id ?? "");
+      setDepartmentId((memberData as { department_id: string | null }).department_id ?? "none");
       setHourlyRate(String((memberData as { hourly_rate: number | null }).hourly_rate ?? ""));
       setMaxHours(String((memberData as { max_hours_per_week: number | null }).max_hours_per_week ?? "40"));
 
@@ -102,7 +129,7 @@ export default function MemberDetailPage() {
       .from("shop_members")
       .update({
         role,
-        department_id: departmentId || null,
+        department_id: departmentId === "none" ? null : departmentId,
         hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
         max_hours_per_week: maxHours ? parseInt(maxHours) : 40,
       })
@@ -182,7 +209,7 @@ export default function MemberDetailPage() {
                 <SelectValue placeholder="No department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {departments.map((dept) => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name}
@@ -253,6 +280,67 @@ export default function MemberDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {weekMetrics && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+            <CardDescription>This week</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Hours</span>
+                <p className="text-lg font-semibold">
+                  {weekMetrics.total_hours_worked}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Overtime</span>
+                <p className="text-lg font-semibold">
+                  {weekMetrics.overtime_hours}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Late</span>
+                <p className="text-lg font-semibold">
+                  {weekMetrics.late_arrivals}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {ptoBalance && (
+        <Card>
+          <CardHeader>
+            <CardTitle>PTO Balance</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Accrued</span>
+                <p className="text-lg font-semibold">
+                  {ptoBalance.hours_accrued}h
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Available</span>
+                <p className="text-lg font-semibold">
+                  {ptoBalance.hours_available}h
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/reports/${memberId}`}
+              className="text-sm text-primary hover:underline"
+            >
+              View Full Report &rarr;
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
