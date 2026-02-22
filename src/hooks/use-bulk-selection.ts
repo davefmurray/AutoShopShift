@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import type { Shift } from "@/hooks/use-shifts";
 
 export function useBulkSelection(shifts: Shift[], timezone: string) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [rawSelectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Prune orphaned IDs when shifts array changes (e.g. realtime deletions)
-  useEffect(() => {
-    const currentIds = new Set(shifts.map((s) => s.id));
-    setSelectedIds((prev) => {
-      const pruned = new Set([...prev].filter((id) => currentIds.has(id)));
-      return pruned.size === prev.size ? prev : pruned;
-    });
-  }, [shifts]);
+  // Derive valid selection by intersecting with current shift IDs (prunes orphans)
+  const validShiftIds = useMemo(() => new Set(shifts.map((s) => s.id)), [shifts]);
+  const selectedIds = useMemo(() => {
+    const hasOrphans = [...rawSelectedIds].some((id) => !validShiftIds.has(id));
+    if (!hasOrphans) return rawSelectedIds;
+    return new Set([...rawSelectedIds].filter((id) => validShiftIds.has(id)));
+  }, [rawSelectedIds, validShiftIds]);
 
   // Lookup maps for efficient group operations
   const { shiftsByUser, shiftsByDate } = useMemo(() => {
