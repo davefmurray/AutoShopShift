@@ -9,6 +9,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, Mail, Phone } from "lucide-react";
 import { useState } from "react";
 import { InviteMemberDialog } from "@/components/team/invite-member-dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 
 type Member = {
@@ -31,18 +33,24 @@ type Member = {
 export default function TeamPage() {
   const shopId = useShopStore((s) => s.activeShopId);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data: members, isLoading } = useQuery({
-    queryKey: ["team", shopId],
+    queryKey: ["team", shopId, showArchived],
     queryFn: async (): Promise<Member[]> => {
       if (!shopId) return [];
       const supabase = createClient();
 
-      const { data: memberData } = await supabase
+      let query = supabase
         .from("shop_members")
         .select("*")
-        .eq("shop_id", shopId)
-        .eq("is_active", true);
+        .eq("shop_id", shopId);
+
+      if (!showArchived) {
+        query = query.eq("is_active", true);
+      }
+
+      const { data: memberData } = await query;
 
       if (!memberData?.length) return [];
 
@@ -97,6 +105,17 @@ export default function TeamPage() {
             Manage your shop members and positions
           </p>
         </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-archived"
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+            />
+            <Label htmlFor="show-archived" className="text-sm whitespace-nowrap">
+              Show archived
+            </Label>
+          </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link href="/team/positions">Positions</Link>
@@ -105,6 +124,7 @@ export default function TeamPage() {
             <Plus className="mr-2 h-4 w-4" />
             Invite
           </Button>
+        </div>
         </div>
       </div>
 
@@ -116,7 +136,9 @@ export default function TeamPage() {
             <Link
               key={member.id}
               href={`/team/${member.id}`}
-              className="block rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+              className={`block rounded-lg border p-4 hover:bg-muted/50 transition-colors${
+                !member.is_active ? " opacity-60" : ""
+              }`}
             >
               <div className="flex items-start gap-3">
                 <Avatar>
@@ -140,6 +162,14 @@ export default function TeamPage() {
                     >
                       {member.role}
                     </Badge>
+                    {!member.is_active && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400"
+                      >
+                        Archived
+                      </Badge>
+                    )}
                   </div>
                   {member.profile?.email && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
