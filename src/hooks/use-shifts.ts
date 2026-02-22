@@ -4,6 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useShopStore } from "@/stores/shop-store";
+import {
+  getShiftBreaks,
+  getShiftHistory,
+  getShopTags,
+  getShiftTagAssignments,
+} from "@/actions/shifts";
 
 export type Shift = {
   id: string;
@@ -17,6 +23,8 @@ export type Shift = {
   status: "draft" | "published";
   is_open: boolean;
   notes: string | null;
+  color: string | null;
+  recurrence_group_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -172,5 +180,92 @@ export function useSchedules() {
       return data ?? [];
     },
     enabled: !!shopId,
+  });
+}
+
+// --- New hooks for shift dialog features ---
+
+export type ShiftBreak = {
+  id: string;
+  shift_id: string;
+  label: string;
+  duration_minutes: number;
+  is_paid: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
+export function useShiftBreaks(shiftId: string | null) {
+  return useQuery({
+    queryKey: ["shift-breaks", shiftId],
+    queryFn: async (): Promise<ShiftBreak[]> => {
+      if (!shiftId) return [];
+      const result = await getShiftBreaks(shiftId);
+      if ("error" in result) return [];
+      return result.data as ShiftBreak[];
+    },
+    enabled: !!shiftId,
+  });
+}
+
+export type ShiftHistoryEntry = {
+  id: string;
+  shift_id: string;
+  shop_id: string;
+  action: string;
+  changed_by: string | null;
+  old_data: unknown;
+  new_data: unknown;
+  created_at: string;
+  profiles: { full_name: string | null } | null;
+};
+
+export function useShiftHistory(shiftId: string | null) {
+  return useQuery({
+    queryKey: ["shift-history", shiftId],
+    queryFn: async (): Promise<ShiftHistoryEntry[]> => {
+      if (!shiftId) return [];
+      const result = await getShiftHistory(shiftId);
+      if ("error" in result) return [];
+      return result.data as ShiftHistoryEntry[];
+    },
+    enabled: !!shiftId,
+  });
+}
+
+export type ShopTag = {
+  id: string;
+  shop_id: string;
+  name: string;
+  created_at: string;
+};
+
+export function useShopTags() {
+  const shopId = useShopStore((s) => s.activeShopId);
+
+  return useQuery({
+    queryKey: ["shop-tags", shopId],
+    queryFn: async (): Promise<ShopTag[]> => {
+      if (!shopId) return [];
+      const result = await getShopTags(shopId);
+      if ("error" in result) return [];
+      return result.data as ShopTag[];
+    },
+    enabled: !!shopId,
+  });
+}
+
+export function useShiftTagIds(shiftId: string | null) {
+  return useQuery({
+    queryKey: ["shift-tag-ids", shiftId],
+    queryFn: async (): Promise<string[]> => {
+      if (!shiftId) return [];
+      const result = await getShiftTagAssignments(shiftId);
+      if ("error" in result) return [];
+      return result.data.map(
+        (a: { tag_id: string }) => a.tag_id
+      );
+    },
+    enabled: !!shiftId,
   });
 }
