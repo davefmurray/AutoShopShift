@@ -10,6 +10,8 @@ import {
   updateDepartment,
   deleteDepartment,
 } from "@/actions/departments";
+import { getPayPeriodSettings } from "@/lib/pay-period";
+import { updatePayPeriodSettings } from "@/actions/timesheets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +58,11 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState("America/New_York");
 
+  // Pay period state
+  const [weekStartDay, setWeekStartDay] = useState(1);
+  const [payPeriodSaving, setPayPeriodSaving] = useState(false);
+  const [payPeriodSuccess, setPayPeriodSuccess] = useState(false);
+
   // Department state
   const { data: departments = [] } = useDepartments();
   const [newDeptName, setNewDeptName] = useState("");
@@ -86,6 +93,7 @@ export default function SettingsPage() {
           zip: string | null;
           phone: string | null;
           timezone: string;
+          settings: Record<string, unknown> | null;
         };
         setName(shop.name);
         setAddress(shop.address ?? "");
@@ -94,6 +102,8 @@ export default function SettingsPage() {
         setZip(shop.zip ?? "");
         setPhone(shop.phone ?? "");
         setTimezone(shop.timezone);
+        const settings = getPayPeriodSettings(shop.settings);
+        setWeekStartDay(settings.week_start_day);
       }
       return data;
     },
@@ -124,6 +134,24 @@ export default function SettingsPage() {
     setSuccess(true);
     setSaving(false);
     setTimeout(() => setSuccess(false), 3000);
+  }
+
+  async function handleSavePayPeriod() {
+    if (!shopId) return;
+    setPayPeriodSaving(true);
+    setPayPeriodSuccess(false);
+
+    const result = await updatePayPeriodSettings({
+      shop_id: shopId,
+      week_start_day: weekStartDay,
+    });
+
+    if (!result.error) {
+      await queryClient.invalidateQueries({ queryKey: ["shop-settings", shopId] });
+      setPayPeriodSuccess(true);
+      setTimeout(() => setPayPeriodSuccess(false), 3000);
+    }
+    setPayPeriodSaving(false);
   }
 
   async function handleAddDepartment() {
@@ -275,6 +303,41 @@ export default function SettingsPage() {
           </div>
           <Button type="submit" form="settings-form" disabled={saving}>
             {saving ? "Saving..." : "Save changes"}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pay Period</CardTitle>
+          <CardDescription>
+            Configure your pay period for timesheet calculations
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="week-start">Week starts on</Label>
+            <Select
+              value={String(weekStartDay)}
+              onValueChange={(v) => setWeekStartDay(Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => (
+                  <SelectItem key={i} value={String(i)}>{day}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+        <CardFooter className="flex items-center justify-between">
+          <div>
+            {payPeriodSuccess && <p className="text-sm text-green-600">Pay period settings saved!</p>}
+          </div>
+          <Button onClick={handleSavePayPeriod} disabled={payPeriodSaving}>
+            {payPeriodSaving ? "Saving..." : "Save"}
           </Button>
         </CardFooter>
       </Card>
