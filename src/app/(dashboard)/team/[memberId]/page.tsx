@@ -105,7 +105,7 @@ export default function MemberDetailPage() {
 
       // Set form state
       setRole((memberData as { role: string }).role);
-      setDepartmentId((memberData as { department_id: string | null }).department_id ?? "");
+      setDepartmentId((memberData as { department_id: string | null }).department_id ?? "none");
       setHourlyRate(String((memberData as { hourly_rate: number | null }).hourly_rate ?? ""));
       setMaxHours(String((memberData as { max_hours_per_week: number | null }).max_hours_per_week ?? "40"));
 
@@ -129,7 +129,7 @@ export default function MemberDetailPage() {
       .from("shop_members")
       .update({
         role,
-        department_id: departmentId || null,
+        department_id: departmentId === "none" ? null : departmentId,
         hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
         max_hours_per_week: maxHours ? parseInt(maxHours) : 40,
       })
@@ -209,7 +209,7 @@ export default function MemberDetailPage() {
                 <SelectValue placeholder="No department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {departments.map((dept) => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name}
