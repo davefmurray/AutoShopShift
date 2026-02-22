@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, PenLine } from "lucide-react";
+import { ArrowLeft, History, PenLine } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,9 @@ import { PayPeriodNavigator } from "@/components/timesheets/pay-period-navigator
 import { TimesheetTable } from "@/components/timesheets/timesheet-table";
 import { SignTimesheetDialog } from "@/components/timesheets/sign-timesheet-dialog";
 import { ExportButtons } from "@/components/timesheets/export-buttons";
+import { EditTimesheetDialog } from "@/components/timesheets/edit-timesheet-dialog";
+import { TimesheetActivityPanel } from "@/components/timesheets/timesheet-activity-panel";
+import type { TimesheetDayRow } from "@/types/timesheets";
 
 export default function MemberTimesheetPage() {
   const { memberId } = useParams<{ memberId: string }>();
@@ -37,6 +40,8 @@ export default function MemberTimesheetPage() {
   const [currentPeriod, setCurrentPeriod] = useState(() =>
     getCurrentPayPeriod(weekStartDay)
   );
+  const [editingRow, setEditingRow] = useState<TimesheetDayRow | null>(null);
+  const [activityPanelOpen, setActivityPanelOpen] = useState(false);
 
   const periodStart = format(currentPeriod.start, "yyyy-MM-dd");
   const periodEnd = format(currentPeriod.end, "yyyy-MM-dd");
@@ -107,6 +112,8 @@ export default function MemberTimesheetPage() {
 
   const isOwnTimesheet = currentUser?.id === member.user_id;
   const canSign = isOwnTimesheet && !signature;
+  const isAdmin =
+    currentUser?.role === "owner" || currentUser?.role === "manager";
 
   return (
     <div className="space-y-6">
@@ -118,6 +125,16 @@ export default function MemberTimesheetPage() {
         </Button>
         <h1 className="text-2xl font-bold">{member.full_name}</h1>
         <div className="ml-auto flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setActivityPanelOpen(true)}
+            >
+              <History className="mr-2 h-4 w-4" />
+              Activity Log
+            </Button>
+          )}
           {rows.length > 0 && (
             <ExportButtons
               shopName={shop?.name ?? "Shop"}
@@ -160,8 +177,32 @@ export default function MemberTimesheetPage() {
           rows={rows}
           summary={summary}
           signature={signature}
+          isAdmin={isAdmin}
+          onEditRow={isAdmin ? setEditingRow : undefined}
         />
       )}
+
+      {editingRow && (
+        <EditTimesheetDialog
+          open={!!editingRow}
+          onOpenChange={(open) => {
+            if (!open) setEditingRow(null);
+          }}
+          row={editingRow}
+          userId={member.user_id}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          timezone={timezone}
+        />
+      )}
+
+      <TimesheetActivityPanel
+        userId={member.user_id}
+        startDate={periodStart}
+        endDate={periodEnd}
+        open={activityPanelOpen}
+        onOpenChange={setActivityPanelOpen}
+      />
     </div>
   );
 }
