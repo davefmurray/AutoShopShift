@@ -12,6 +12,7 @@ import {
   Settings,
   Wrench,
   ArrowLeftRight,
+  BarChart3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ const navItems = [
   { title: "Team", href: "/team", icon: Users },
   { title: "Swaps", href: "/swaps", icon: ArrowLeftRight },
   { title: "Time Off", href: "/time-off", icon: CalendarOff },
+  { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Templates", href: "/templates", icon: LayoutTemplate },
   { title: "Notifications", href: "/notifications", icon: Bell },
   { title: "Settings", href: "/settings", icon: Settings },
