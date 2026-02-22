@@ -1,5 +1,6 @@
 export type TimesheetDayRow = {
   day_date: string;
+  time_record_id: string | null;
   clock_in: string | null;
   clock_out: string | null;
   total_worked_hours: number;
@@ -24,6 +25,18 @@ export type TimesheetSignature = {
   signature_data: string;
   ip_address: string | null;
   created_at: string;
+};
+
+export type TimesheetActivityEntry = {
+  id: string;
+  time_record_id: string;
+  action: "edit" | "create" | "delete";
+  changed_by: string | null;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  notes: string | null;
+  created_at: string;
+  profiles: { full_name: string | null } | null;
 };
 
 export type TimesheetSummary = {
