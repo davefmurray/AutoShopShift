@@ -47,7 +47,10 @@ export function ShiftCard({
       style={style}
       {...attributes}
       {...listeners}
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
       className={cn(
         "rounded-md border-l-4 bg-card p-2 shadow-sm cursor-grab active:cursor-grabbing transition-shadow hover:shadow-md",
         isDragging && "opacity-50 shadow-lg",
@@ -55,9 +58,11 @@ export function ShiftCard({
         compact ? "text-xs" : "text-sm"
       )}
     >
-      <div className="font-medium truncate">
-        {shift.is_open ? "Open Shift" : memberName ?? "Unassigned"}
-      </div>
+      {(!compact || !shift.user_id || memberName) && (
+        <div className="font-medium truncate">
+          {shift.is_open ? "Open Shift" : memberName ?? "Unassigned"}
+        </div>
+      )}
       <div className="text-muted-foreground truncate">{timeDisplay}</div>
       {!compact && positionName && (
         <div className="text-xs mt-1" style={{ color: positionColor }}>

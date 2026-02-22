@@ -31,6 +31,8 @@ export default function SchedulePage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [defaultUserId, setDefaultUserId] = useState<string | undefined>();
+  const [dialogDefaultDate, setDialogDefaultDate] = useState(format(currentDate, "yyyy-MM-dd"));
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
@@ -48,6 +50,15 @@ export default function SchedulePage() {
 
   function handleNewShift() {
     setEditingShift(null);
+    setDefaultUserId(undefined);
+    setDialogDefaultDate(format(currentDate, "yyyy-MM-dd"));
+    setDialogOpen(true);
+  }
+
+  function handleCellClick(userId: string, dateStr: string) {
+    setEditingShift(null);
+    setDefaultUserId(userId === "__open__" ? undefined : userId);
+    setDialogDefaultDate(dateStr);
     setDialogOpen(true);
   }
 
@@ -77,25 +88,41 @@ export default function SchedulePage() {
 
     const supabase = createClient();
 
-    if (dropTarget.startsWith("user-")) {
-      const parts = dropTarget.split("-");
-      const userId = parts[1];
-      const targetDate = parts.slice(2).join("-");
+    if (dropTarget.startsWith("cell-")) {
+      const withoutPrefix = dropTarget.slice(5); // strip "cell-"
+      let targetUserId: string | null;
+      let targetDate: string;
+
+      if (withoutPrefix.startsWith("open-")) {
+        targetUserId = null;
+        targetDate = withoutPrefix.slice(5); // strip "open-"
+      } else {
+        // Format: {userId}-{YYYY-MM-DD} — date is always last 10 chars
+        targetDate = withoutPrefix.slice(-10);
+        targetUserId = withoutPrefix.slice(0, -(10 + 1)); // strip "-YYYY-MM-DD"
+      }
 
       const shift = shifts.find((s) => s.id === shiftId);
       if (!shift) return;
 
       const shiftDate = format(new Date(shift.start_time), "yyyy-MM-dd");
-      const updates: Record<string, string | null> = {
-        user_id: userId === "open" ? null : userId,
-      };
+      const updates: Record<string, string | boolean | null> = {};
 
+      // User change
+      if (targetUserId !== (shift.user_id ?? null)) {
+        updates.user_id = targetUserId;
+        updates.is_open = targetUserId === null;
+      }
+
+      // Date change
       if (targetDate !== shiftDate) {
         const startTime = format(new Date(shift.start_time), "HH:mm:ss");
         const endTime = format(new Date(shift.end_time), "HH:mm:ss");
         updates.start_time = `${targetDate}T${startTime}`;
         updates.end_time = `${targetDate}T${endTime}`;
       }
+
+      if (Object.keys(updates).length === 0) return;
 
       await supabase.from("shifts").update(updates).eq("id", shiftId);
       queryClient.invalidateQueries({ queryKey: ["shifts", shopId] });
@@ -117,7 +144,7 @@ export default function SchedulePage() {
             Loading schedule...
           </div>
         ) : view === "week" ? (
-          <WeekView shifts={shifts} onShiftClick={handleEditShift} />
+          <WeekView shifts={shifts} onShiftClick={handleEditShift} onCellClick={handleCellClick} />
         ) : view === "day" ? (
           <DayView shifts={shifts} onShiftClick={handleEditShift} />
         ) : (
@@ -131,7 +158,8 @@ export default function SchedulePage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         shift={editingShift}
-        defaultDate={format(currentDate, "yyyy-MM-dd")}
+        defaultDate={dialogDefaultDate}
+        defaultUserId={defaultUserId}
       />
     </div>
   );

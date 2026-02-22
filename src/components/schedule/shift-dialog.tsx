@@ -32,6 +32,7 @@ type ShiftDialogProps = {
   onOpenChange: (open: boolean) => void;
   shift?: Shift | null;
   defaultDate?: string;
+  defaultUserId?: string;
 };
 
 export function ShiftDialog({
@@ -39,6 +40,7 @@ export function ShiftDialog({
   onOpenChange,
   shift,
   defaultDate,
+  defaultUserId,
 }: ShiftDialogProps) {
   const shopId = useShopStore((s) => s.activeShopId);
   const timezone = useShopTimezone();
@@ -68,7 +70,7 @@ export function ShiftDialog({
       date: defaultDate ?? format(new Date(), "yyyy-MM-dd"),
       startTime: "08:00",
       endTime: "17:00",
-      userId: "none",
+      userId: defaultUserId ?? "none",
       positionId: "none",
       scheduleId: "none",
       breakMinutes: "30",
@@ -103,7 +105,7 @@ export function ShiftDialog({
     setNotes(state.notes);
     // Only reset when the shift being edited changes, not on every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shiftId, defaultDate]);
+  }, [shiftId, defaultDate, defaultUserId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
